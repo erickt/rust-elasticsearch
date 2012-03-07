@@ -1,0 +1,7 @@
+#[link(name = "elasticsearch",
+       vers = "0.1pre",
+       uuid = "51a41dbe-d547-4804-8300-8a1b5d00d093")];
+#[crate_type = "lib"];
+
+use std;
+use zmq;

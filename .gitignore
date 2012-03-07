@@ -1,0 +1,4 @@
+*.sw[po]
+elasticsearch
+*.dylib
+*.dSYM
