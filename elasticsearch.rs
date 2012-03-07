@@ -3,27 +3,25 @@ import std::io;
 import std::json;
 import zmq::{context, socket, error};
 
-type client = {
-    socket: zmq::socket,
-};
-
-fn connect(ctx: zmq::context, addr: str) -> client {
-    let socket = alt ctx.socket(zmq::REQ) {
-      ok(socket) { socket }
-      err(e) { fail e.to_str() }
-    };
-
-    str::as_bytes(addr) { |bytes|
-        alt socket.connect(bytes) {
-          ok(()) {}
-          err(e) { fail e.to_str(); }
-        }
-    }
-
-    { socket: socket }
+iface transport {
+    fn head(path: str) -> response::t;
+    fn get(path: str) -> response::t;
+    fn put(path: str, doc: json::json) -> response::t;
+    fn post(path: str, doc: json::json) -> response::t;
+    fn delete(path: str) -> response::t;
 }
 
-impl client for client {
+type client = { transport: transport };
+
+fn mk_client(transport: transport) -> client {
+    { transport: transport }
+}
+
+#[doc = "Transport to talk to Elasticsearch with zeromq"]
+type zmq_transport = { socket: zmq::socket };
+
+#[doc = "Zeromq transport implementation"]
+impl of transport for zmq_transport {
     fn head(path: str) -> response::t { self.send("HEAD|" + path) }
     fn get(path: str) -> response::t { self.send("GET|" + path) }
     fn put(path: str, doc: json::json) -> response::t {
@@ -49,6 +47,29 @@ impl client for client {
           err(e) { fail e.to_str(); }
         }
     }
+}
+
+#[doc = "Create a zeromq transport to Elasticsearch"]
+fn mk_zmq_transport(ctx: zmq::context, addr: str) -> transport {
+    let socket = alt ctx.socket(zmq::REQ) {
+      ok(socket) { socket }
+      err(e) { fail e.to_str() }
+    };
+
+    str::as_bytes(addr) { |bytes|
+        alt socket.connect(bytes) {
+          ok(()) {}
+          err(e) { fail e.to_str(); }
+        }
+    }
+
+    { socket: socket } as transport
+}
+
+#[doc = "Helper function to creating a client with zeromq"]
+fn connect_with_zmq(ctx: zmq::context, addr: str) -> client {
+    let transport = mk_zmq_transport(ctx, addr);
+    mk_client(transport)
 }
 
 mod response {
@@ -113,17 +134,17 @@ mod tests {
           err(e) { fail e.to_str(); }
         };
 
-        let client = connect(ctx, "tcp://localhost:9702");
-        io::println(#fmt("%?\n", client.head("/")));
-        io::println(#fmt("%?\n", client.get("/")));
+        let client = connect_with_zmq(ctx, "tcp://localhost:9700");
+        io::println(#fmt("%?\n", client.transport.head("/")));
+        io::println(#fmt("%?\n", client.transport.get("/")));
 
         let doc = map::new_str_hash();
         doc.insert("foo", json::string("bar"));
 
-        io::println(#fmt("%?\n", client.get("/test/test/1")));
-        io::println(#fmt("%?\n", client.put("/test/test/1", json::dict(doc))));
-        io::println(#fmt("%?\n", client.get("/test/test/1")));
+        io::println(#fmt("%?\n", client.transport.get("/test/test/1")));
+        io::println(#fmt("%?\n", client.transport.put("/test/test/1", json::dict(doc))));
+        io::println(#fmt("%?\n", client.transport.get("/test/test/1")));
 
-        io::println(#fmt("%?\n", client.delete("/test/test/1")));
+        io::println(#fmt("%?\n", client.transport.delete("/test/test/1")));
     }
 }
