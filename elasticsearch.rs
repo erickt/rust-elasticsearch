@@ -26,6 +26,10 @@ impl client for client {
         let path = index + "/" + typ + "/" + id;
         self.transport.get(path)
     }
+    fn delete(index: str, typ: str, id: str) -> response::t {
+        let path = index + "/" + typ + "/" + id;
+        self.transport.delete(path)
+    }
 }
 
 enum consistency { CONSISTENCY_DEFAULT, ONE, QUORUM, ALL }
@@ -408,6 +412,6 @@ mod tests {
         //io::println(#fmt("%?\n", client.transport.put("/test/test/1", doc)));
         io::println(#fmt("%?\n", client.transport.get("/test/test/1")));
 
-        io::println(#fmt("%?\n", client.transport.delete("/test/test/1")));
+        io::println(#fmt("%?\n", client.delete("test", "test", "1")));
     }
 }
