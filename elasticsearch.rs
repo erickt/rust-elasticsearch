@@ -3,11 +3,13 @@ import std::io;
 import std::json;
 import zmq::{context, socket, error};
 
+import json = std::json::json;
+
 iface transport {
     fn head(path: str) -> response::t;
     fn get(path: str) -> response::t;
-    fn put(path: str, doc: json::json) -> response::t;
-    fn post(path: str, doc: json::json) -> response::t;
+    fn put(path: str, doc: json) -> response::t;
+    fn post(path: str, doc: json) -> response::t;
     fn delete(path: str) -> response::t;
 }
 
@@ -24,10 +26,10 @@ type zmq_transport = { socket: zmq::socket };
 impl of transport for zmq_transport {
     fn head(path: str) -> response::t { self.send("HEAD|" + path) }
     fn get(path: str) -> response::t { self.send("GET|" + path) }
-    fn put(path: str, doc: json::json) -> response::t {
+    fn put(path: str, doc: json) -> response::t {
         self.send("PUT|" + path + "|" + json::to_str(doc))
     }
-    fn post(path: str, doc: json::json) -> response::t {
+    fn post(path: str, doc: json) -> response::t {
         self.send("POST|" + path + "|" + json::to_str(doc))
     }
     fn delete(path: str) -> response::t {
@@ -76,7 +78,7 @@ mod response {
     type t = {
         code: uint,
         status: str,
-        doc: json::json,
+        doc: json,
     };
 
     fn parse(msg: [u8]) -> t {
@@ -110,8 +112,7 @@ mod response {
         }
     }
 
-    fn parse_doc(msg: [u8], start: uint, end: uint)
-      -> json::json {
+    fn parse_doc(msg: [u8], start: uint, end: uint) -> json {
         if start == end { ret json::null; }
 
         io::with_bytes_reader_between(msg, start, end) { |rdr|
