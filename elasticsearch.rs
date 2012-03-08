@@ -408,8 +408,6 @@ mod tests {
           )
           .execute(client);
 
-        //io::println(#fmt("%?\n", client.get("test", "test", "1")));
-        //io::println(#fmt("%?\n", client.transport.put("/test/test/1", doc)));
         io::println(#fmt("%?\n", client.transport.get("/test/test/1")));
 
         io::println(#fmt("%?\n", client.delete("test", "test", "1")));
