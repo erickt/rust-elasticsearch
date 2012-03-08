@@ -26,6 +26,9 @@ impl client for client {
         let path = index + "/" + typ + "/" + id;
         self.transport.get(path)
     }
+    fn prepare_index(index: str, typ: str) -> index_builder {
+        mk_index_builder(self, index, typ)
+    }
     fn delete(index: str, typ: str, id: str) -> response::t {
         let path = index + "/" + typ + "/" + id;
         self.transport.delete(path)
@@ -38,6 +41,7 @@ enum op_type { CREATE, INDEX }
 enum version_type { INTERNAL, EXTERNAL }
 
 type index_builder = {
+    client: client,
     index: str,
     typ: str,
     mut id: option<str>,
@@ -55,8 +59,9 @@ type index_builder = {
     mut source: option<map<str, json>>,
 };
 
-fn mk_index_builder(index: str, typ: str) -> index_builder {
+fn mk_index_builder(client: client, index: str, typ: str) -> index_builder {
     {
+        client: client,
         index: index,
         typ: typ,
         mut id: none,
@@ -122,7 +127,7 @@ impl index_builder for index_builder {
         self.source = some(source);
         self
     }
-    fn execute(client: client) -> response::t {
+    fn execute() -> response::t {
         let path = [self.index, self.typ];
         alt self.id {
           none {}
@@ -189,8 +194,8 @@ impl index_builder for index_builder {
         };
 
         alt self.id {
-          none { client.transport.put(path, source) }
-          some(_) { client.transport.post(path, source) }
+          none { self.client.transport.put(path, source) }
+          some(_) { self.client.transport.post(path, source) }
         }
     }
 }
@@ -392,7 +397,7 @@ mod tests {
 
         io::println(#fmt("%?\n", client.transport.get("/test/test/1")));
 
-        mk_index_builder("test", "test")
+        io::println(#fmt("%?\n", client.prepare_index("test", "test")
           .set_id("1")
           .set_version(2u)
           .set_source(mk_json_dict_builder()
@@ -406,7 +411,7 @@ mod tests {
               }
               .dict
           )
-          .execute(client);
+          .execute()));
 
         io::println(#fmt("%?\n", client.transport.get("/test/test/1")));
 
