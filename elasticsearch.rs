@@ -7,12 +7,32 @@ import zmq::{context, socket, error};
 
 import json = std::json::json;
 
+export transport, mk_zmq_transport;
+export client, mk_client;
+export consistency;
+export CONSISTENCY_DEFAULT, ONE, QUORUM, ALL;
+export replication;
+export REPLICATION_DEFAULT, SYNC, ASYNC;
+export op_type;
+export CREATE, INDEX;
+export version_type;
+export INTERNAL, EXTERNAL;
+export index_builder, mk_index_builder;
+export search_type;
+export SEARCH_DEFAULT, DFS_QUERY_THEN_FETCH, QUERY_THEN_FETCH;
+export DFS_QUERY_AND_FETCH, QUERY_AND_FETCH, SCAN, COUNT;
+export search_builder, mk_search_builder;
+export json_dict_builder, mk_json_dict_builder;
+export json_list_builder, mk_json_list_builder;
+export response;
+
+
 iface transport {
-    fn head(path: str) -> response::t;
-    fn get(path: str) -> response::t;
-    fn put(path: str, source: hashmap<str, json>) -> response::t;
-    fn post(path: str, source: hashmap<str, json>) -> response::t;
-    fn delete(path: str) -> response::t;
+    fn head(path: str) -> response;
+    fn get(path: str) -> response;
+    fn put(path: str, source: hashmap<str, json>) -> response;
+    fn post(path: str, source: hashmap<str, json>) -> response;
+    fn delete(path: str) -> response;
 }
 
 type client = { transport: transport };
@@ -22,7 +42,7 @@ fn mk_client(transport: transport) -> client {
 }
 
 impl client for client {
-    fn get(index: str, typ: str, id: str) -> response::t {
+    fn get(index: str, typ: str, id: str) -> response {
         let path = index + "/" + typ + "/" + id;
         self.transport.get(path)
     }
@@ -32,7 +52,7 @@ impl client for client {
     fn prepare_search() -> search_builder {
         mk_search_builder(self)
     }
-    fn delete(index: str, typ: str, id: str) -> response::t {
+    fn delete(index: str, typ: str, id: str) -> response {
         let path = index + "/" + typ + "/" + id;
         self.transport.delete(path)
     }
@@ -133,7 +153,7 @@ impl index_builder for index_builder {
         self.source = some(source);
         self
     }
-    fn execute() -> response::t {
+    fn execute() -> response {
         let path = [self.index, self.typ];
         alt self.id {
           none {}
@@ -275,7 +295,7 @@ impl search_builder for search_builder {
         self.source = some(source);
         self
     }
-    fn execute() -> response::t {
+    fn execute() -> response {
         let path = [];
 
         alt self.index {
@@ -418,19 +438,19 @@ type zmq_transport = { socket: zmq::socket };
 
 #[doc = "Zeromq transport implementation"]
 impl of transport for zmq_transport {
-    fn head(path: str) -> response::t { self.send("HEAD|" + path) }
-    fn get(path: str) -> response::t { self.send("GET|" + path) }
-    fn put(path: str, source: hashmap<str, json>) -> response::t {
+    fn head(path: str) -> response { self.send("HEAD|" + path) }
+    fn get(path: str) -> response { self.send("GET|" + path) }
+    fn put(path: str, source: hashmap<str, json>) -> response {
         self.send("PUT|" + path + "|" + json::to_str(json::dict(source)))
     }
-    fn post(path: str, source: hashmap<str, json>) -> response::t {
+    fn post(path: str, source: hashmap<str, json>) -> response {
         self.send("POST|" + path + "|" + json::to_str(json::dict(source)))
     }
-    fn delete(path: str) -> response::t {
+    fn delete(path: str) -> response {
         self.send("DELETE|" + path)
     }
 
-    fn send(request: str) -> response::t {
+    fn send(request: str) -> response {
         str::as_bytes(request) { |bytes|
             alt self.socket.send_between(bytes, 0u, str::len(request), 0) {
               ok(()) {}
@@ -468,23 +488,23 @@ fn connect_with_zmq(ctx: zmq::context, addr: str) -> client {
     mk_client(transport)
 }
 
-mod response {
-    type t = {
-        code: uint,
-        status: str,
-        doc: json,
-    };
+type response = {
+    code: uint,
+    status: str,
+    body: json,
+};
 
-    fn parse(msg: [u8]) -> t {
+mod response {
+    fn parse(msg: [u8]) -> response {
         io::println(#fmt("parse: %?", str::from_bytes(msg)));
 
         let end = vec::len(msg);
 
         let (start, code) = parse_code(msg, end);
         let (start, status) = parse_status(msg, start, end);
-        let doc = parse_doc(msg, start, end);
+        let body = parse_body(msg, start, end);
 
-        { code: code, status: status, doc: doc }
+        { code: code, status: status, body: body }
     }
 
     fn parse_code(msg: [u8], end: uint) -> (uint, uint) {
@@ -506,7 +526,7 @@ mod response {
         }
     }
 
-    fn parse_doc(msg: [u8], start: uint, end: uint) -> json {
+    fn parse_body(msg: [u8], start: uint, end: uint) -> json {
         if start == end { ret json::null; }
 
         io::with_bytes_reader_between(msg, start, end) { |rdr|
