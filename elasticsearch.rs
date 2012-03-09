@@ -10,8 +10,8 @@ import json = std::json::json;
 iface transport {
     fn head(path: str) -> response::t;
     fn get(path: str) -> response::t;
-    fn put(path: str, doc: hashmap<str, json>) -> response::t;
-    fn post(path: str, doc: hashmap<str, json>) -> response::t;
+    fn put(path: str, source: hashmap<str, json>) -> response::t;
+    fn post(path: str, source: hashmap<str, json>) -> response::t;
     fn delete(path: str) -> response::t;
 }
 
@@ -28,6 +28,9 @@ impl client for client {
     }
     fn prepare_index(index: str, typ: str) -> index_builder {
         mk_index_builder(self, index, typ)
+    }
+    fn prepare_search() -> search_builder {
+        mk_search_builder(self)
     }
     fn delete(index: str, typ: str, id: str) -> response::t {
         let path = index + "/" + typ + "/" + id;
@@ -102,7 +105,10 @@ impl index_builder for index_builder {
         self.op_type = op_type;
         self
     }
-    fn set_refresh() -> index_builder { self.refresh = true; self }
+    fn set_refresh(refresh: bool) -> index_builder {
+        self.refresh = refresh;
+        self
+    }
     fn set_version(version: uint) -> index_builder {
         self.version = version;
         self
@@ -200,6 +206,133 @@ impl index_builder for index_builder {
     }
 }
 
+enum search_type {
+    SEARCH_DEFAULT,
+    DFS_QUERY_THEN_FETCH,
+    QUERY_THEN_FETCH,
+    DFS_QUERY_AND_FETCH,
+    QUERY_AND_FETCH,
+    SCAN,
+    COUNT,
+}
+
+type search_builder = {
+    client: client,
+    mut index: option<str>,
+    mut typ: option<str>,
+    mut search_type: search_type,
+    mut scroll: option<str>,
+    mut query_hint: option<str>,
+    mut routing: option<str>,
+    mut preference: option<str>,
+    mut source: option<hashmap<str, json>>,
+};
+
+fn mk_search_builder(client: client) -> search_builder {
+    {
+        client: client,
+        mut index: none,
+        mut typ: none,
+        mut search_type: SEARCH_DEFAULT,
+        mut scroll: none,
+        mut query_hint: none,
+        mut routing: none,
+        mut preference: none,
+        mut source: none,
+    }
+}
+
+impl search_builder for search_builder {
+    fn set_index(index: str) -> search_builder {
+        self.index = some(index);
+        self
+    }
+    fn set_type(typ: str) -> search_builder {
+        self.typ = some(typ);
+        self
+    }
+    fn set_search_type(search_type: search_type) -> search_builder {
+        self.search_type = search_type;
+        self
+    }
+    fn set_scroll(scroll: str) -> search_builder {
+        self.scroll = some(scroll);
+        self
+    }
+    fn set_query_hint(query_hint: str) -> search_builder {
+        self.query_hint = some(query_hint);
+        self
+    }
+    fn set_routing(routing: str) -> search_builder {
+        self.routing = some(routing);
+        self
+    }
+    fn set_preference(preference: str) -> search_builder {
+        self.preference = some(preference);
+        self
+    }
+    fn set_source(source: hashmap<str, json>) -> search_builder {
+        self.source = some(source);
+        self
+    }
+    fn execute() -> response::t {
+        let path = [];
+
+        alt self.index {
+          none {}
+          some(index) { vec::push(path, index); }
+        }
+
+        alt self.typ {
+          none {}
+          some(typ) { vec::push(path, typ); }
+        }
+
+        vec::push(path, "_search");
+        let path = str::connect(path, "/");
+
+        // Build the query parameters.
+        let params = [];
+
+        alt self.search_type {
+          SEARCH_DEFAULT {}
+          DFS_QUERY_THEN_FETCH {
+            vec::push(params, "search_type=dfs_query_then_fetch");
+          }
+          QUERY_THEN_FETCH {
+            vec::push(params, "search_type=query_then_fetch");
+          }
+          DFS_QUERY_AND_FETCH {
+            vec::push(params, "search_type=dfs_query_and_fetch");
+          }
+          QUERY_AND_FETCH { vec::push(params, "search_type=query_and_fetch"); }
+          SCAN { vec::push(params, "search_type=scan"); }
+          COUNT { vec::push(params, "search_type=count"); }
+        }
+
+        alt self.scroll {
+          none {}
+          some(scroll) { vec::push(params, "scroll=" + scroll); }
+        }
+
+        alt self.scroll {
+          none {}
+          some(scroll) { vec::push(params, "scroll=" + scroll); }
+        }
+
+        if vec::is_not_empty(params) {
+            path += "?" + str::connect(params, "&");
+        }
+
+        let source : hashmap<str, json> = alt self.source {
+          none {map::new_str_hash() }
+          some(source) { source }
+        };
+
+        self.client.transport.post(path, source)
+    }
+}
+
 type json_dict_builder = { dict: hashmap<str, json> };
 
 fn mk_json_dict_builder() -> json_dict_builder {
@@ -235,6 +368,11 @@ impl json_dict_builder for json_dict_builder {
         f(builder);
         self.dict.insert(key, json::list(builder.list));
         self
+    }
+    fn field_strs(key: str, values: [str]) -> json_dict_builder {
+        self.field_list(key) { |builder|
+            vec::iter(values) { |value| builder.add_str(value); }
+        }
     }
 }
 
@@ -282,11 +420,11 @@ type zmq_transport = { socket: zmq::socket };
 impl of transport for zmq_transport {
     fn head(path: str) -> response::t { self.send("HEAD|" + path) }
     fn get(path: str) -> response::t { self.send("GET|" + path) }
-    fn put(path: str, doc: hashmap<str, json>) -> response::t {
-        self.send("PUT|" + path + "|" + json::to_str(json::dict(doc)))
+    fn put(path: str, source: hashmap<str, json>) -> response::t {
+        self.send("PUT|" + path + "|" + json::to_str(json::dict(source)))
     }
-    fn post(path: str, doc: hashmap<str, json>) -> response::t {
-        self.send("POST|" + path + "|" + json::to_str(json::dict(doc)))
+    fn post(path: str, source: hashmap<str, json>) -> response::t {
+        self.send("POST|" + path + "|" + json::to_str(json::dict(source)))
     }
     fn delete(path: str) -> response::t {
         self.send("DELETE|" + path)
@@ -382,8 +520,6 @@ mod response {
 
 #[cfg(test)]
 mod tests {
-    import std::map;
-
     #[test]
     fn test() {
         let ctx = alt zmq::init(1) {
@@ -395,7 +531,7 @@ mod tests {
         io::println(#fmt("%?\n", client.transport.head("/")));
         io::println(#fmt("%?\n", client.transport.get("/")));
 
-        io::println(#fmt("%?\n", client.transport.get("/test/test/1")));
+        io::println(#fmt("%?\n", client.get("test", "test", "1")));
 
         io::println(#fmt("%?\n", client.prepare_index("test", "test")
           .set_id("1")
@@ -411,9 +547,18 @@ mod tests {
               }
               .dict
           )
+          .set_refresh(true)
           .execute()));
 
-        io::println(#fmt("%?\n", client.transport.get("/test/test/1")));
+        io::println(#fmt("%?\n", client.get("test", "test", "1")));
+
+        io::println(#fmt("%?\n", client.prepare_search()
+          .set_index("test")
+          .set_source(mk_json_dict_builder()
+              .field_strs("fields", ["foo", "bar"])
+              .dict
+          )
+          .execute()));
 
         io::println(#fmt("%?\n", client.delete("test", "test", "1")));
     }
