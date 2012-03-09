@@ -2,7 +2,7 @@ import result::{ok, err};
 import std::io;
 import std::json;
 import std::map;
-import std::map::map;
+import std::map::hashmap;
 import zmq::{context, socket, error};
 
 import json = std::json::json;
@@ -10,8 +10,8 @@ import json = std::json::json;
 iface transport {
     fn head(path: str) -> response::t;
     fn get(path: str) -> response::t;
-    fn put(path: str, doc: map<str, json>) -> response::t;
-    fn post(path: str, doc: map<str, json>) -> response::t;
+    fn put(path: str, doc: hashmap<str, json>) -> response::t;
+    fn post(path: str, doc: hashmap<str, json>) -> response::t;
     fn delete(path: str) -> response::t;
 }
 
@@ -56,7 +56,7 @@ type index_builder = {
     mut percolate: option<str>,
     mut consistency: consistency,
     mut replication: replication,
-    mut source: option<map<str, json>>,
+    mut source: option<hashmap<str, json>>,
 };
 
 fn mk_index_builder(client: client, index: str, typ: str) -> index_builder {
@@ -123,7 +123,7 @@ impl index_builder for index_builder {
         self.replication = replication;
         self
     }
-    fn set_source(source: map<str, json>) -> index_builder {
+    fn set_source(source: hashmap<str, json>) -> index_builder {
         self.source = some(source);
         self
     }
@@ -200,7 +200,7 @@ impl index_builder for index_builder {
     }
 }
 
-type json_dict_builder = { dict: map<str, json> };
+type json_dict_builder = { dict: hashmap<str, json> };
 
 fn mk_json_dict_builder() -> json_dict_builder {
     { dict: map::new_str_hash() }
@@ -282,10 +282,10 @@ type zmq_transport = { socket: zmq::socket };
 impl of transport for zmq_transport {
     fn head(path: str) -> response::t { self.send("HEAD|" + path) }
     fn get(path: str) -> response::t { self.send("GET|" + path) }
-    fn put(path: str, doc: map<str, json>) -> response::t {
+    fn put(path: str, doc: hashmap<str, json>) -> response::t {
         self.send("PUT|" + path + "|" + json::to_str(json::dict(doc)))
     }
-    fn post(path: str, doc: map<str, json>) -> response::t {
+    fn post(path: str, doc: hashmap<str, json>) -> response::t {
         self.send("POST|" + path + "|" + json::to_str(json::dict(doc)))
     }
     fn delete(path: str) -> response::t {
