@@ -333,82 +333,82 @@ impl search_builder for search_builder {
     }
 }
 
-type json_dict_builder = { dict: hashmap<str, json> };
+type json_dict_builder = hashmap<str, json>;
 
 fn mk_json_dict_builder() -> json_dict_builder {
-    { dict: map::new_str_hash() }
+    map::new_str_hash()
 }
 
 impl json_dict_builder for json_dict_builder {
-    fn field_float(key: str, value: float) -> json_dict_builder {
-        self.dict.insert(key, json::num(value));
+    fn insert_float(key: str, value: float) -> json_dict_builder {
+        self.insert(key, json::num(value));
         self
     }
-    fn field_str(key: str, value: str) -> json_dict_builder {
-        self.dict.insert(key, json::string(value));
+    fn insert_str(key: str, value: str) -> json_dict_builder {
+        self.insert(key, json::string(value));
         self
     }
-    fn field_bool(key: str, value: bool) -> json_dict_builder {
-        self.dict.insert(key, json::boolean(value));
+    fn insert_bool(key: str, value: bool) -> json_dict_builder {
+        self.insert(key, json::boolean(value));
         self
     }
-    fn field_null(key: str) -> json_dict_builder {
-        self.dict.insert(key, json::null);
+    fn insert_null(key: str) -> json_dict_builder {
+        self.insert(key, json::null);
         self
     }
-    fn field_dict(key: str, f: fn(json_dict_builder))
+    fn insert_dict(key: str, f: fn(json_dict_builder))
       -> json_dict_builder {
         let builder = mk_json_dict_builder();
         f(builder);
-        self.dict.insert(key, json::dict(builder.dict));
+        self.insert(key, json::dict(builder));
         self
     }
-    fn field_list(key: str, f: fn(json_list_builder)) -> json_dict_builder {
+    fn insert_list(key: str, f: fn(json_list_builder)) -> json_dict_builder {
         let builder = mk_json_list_builder();
         f(builder);
-        self.dict.insert(key, json::list(builder.list));
+        self.insert(key, json::list(*builder));
         self
     }
-    fn field_strs(key: str, values: [str]) -> json_dict_builder {
-        self.field_list(key) { |builder|
-            vec::iter(values) { |value| builder.add_str(value); }
+    fn insert_strs(key: str, values: [str]) -> json_dict_builder {
+        self.insert_list(key) { |builder|
+            vec::iter(values) { |value| builder.push_str(value); }
         }
     }
 }
 
-type json_list_builder = { mut list: [json] };
+type json_list_builder = @mut [json];
 
 fn mk_json_list_builder() -> json_list_builder {
-    { mut list: [] }
+    @mut []
 }
 
 impl json_list_builder for json_list_builder {
-    fn add_float(value: float) -> json_list_builder {
-        vec::push(self.list, json::num(value));
+    fn push_float(value: float) -> json_list_builder {
+        vec::push(*self, json::num(value));
         self
     }
-    fn add_str(value: str) -> json_list_builder {
-        vec::push(self.list, json::string(value));
+    fn push_str(value: str) -> json_list_builder {
+        vec::push(*self, json::string(value));
         self
     }
-    fn add_bool(value: bool) -> json_list_builder {
-        vec::push(self.list, json::boolean(value));
+    fn push_bool(value: bool) -> json_list_builder {
+        vec::push(*self, json::boolean(value));
         self
     }
-    fn add_null() -> json_list_builder {
-        vec::push(self.list, json::null);
+    fn push_null() -> json_list_builder {
+        vec::push(*self, json::null);
         self
     }
-    fn add_dict(f: fn(json_dict_builder)) -> json_list_builder {
+    fn push_dict(f: fn(json_dict_builder)) -> json_list_builder {
         let builder = mk_json_dict_builder();
         f(builder);
-        vec::push(self.list, json::dict(builder.dict));
+        vec::push(*self, json::dict(builder));
         self
     }
-    fn add_list(f: fn(json_list_builder)) -> json_list_builder {
+    fn push_list(f: fn(json_list_builder)) -> json_list_builder {
         let builder = mk_json_list_builder();
         f(builder);
-        vec::push(self.list, json::list(builder.list));
+        vec::push(*self, json::list(*builder));
         self
     }
 }
@@ -537,15 +537,14 @@ mod tests {
           .set_id("1")
           .set_version(2u)
           .set_source(mk_json_dict_builder()
-              .field_float("foo", 5.0)
-              .field_str("bar", "wee")
-              .field_dict("baz") { |bld|
-                  bld.field_float("a", 2.0);
+              .insert_float("foo", 5.0)
+              .insert_str("bar", "wee")
+              .insert_dict("baz") { |bld|
+                  bld.insert_float("a", 2.0);
               }
-              .field_list("boo") { |bld|
-                  bld.add_float(1.0).add_str("zzz");
+              .insert_list("boo") { |bld|
+                  bld.push_float(1.0).push_str("zzz");
               }
-              .dict
           )
           .set_refresh(true)
           .execute()));
@@ -555,8 +554,7 @@ mod tests {
         io::println(#fmt("%?\n", client.prepare_search()
           .set_index("test")
           .set_source(mk_json_dict_builder()
-              .field_strs("fields", ["foo", "bar"])
-              .dict
+              .insert_strs("fields", ["foo", "bar"])
           )
           .execute()));
 
