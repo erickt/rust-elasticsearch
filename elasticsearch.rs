@@ -26,7 +26,7 @@ export json_dict_builder, mk_json_dict_builder;
 export json_list_builder, mk_json_list_builder;
 export response;
 
-
+#[doc = "The low level interface to elasticsearch"]
 iface transport {
     fn head(path: str) -> response;
     fn get(path: str) -> response;
@@ -35,23 +35,32 @@ iface transport {
     fn delete(path: str) -> response;
 }
 
+#[doc = "The high level interface to elasticsearch"]
 type client = { transport: transport };
 
+#[doc = "Create an elasticsearch client"]
 fn mk_client(transport: transport) -> client {
     { transport: transport }
 }
 
 impl client for client {
+    #[doc = "Get a specific document"]
     fn get(index: str, typ: str, id: str) -> response {
         let path = index + "/" + typ + "/" + id;
         self.transport.get(path)
     }
+
+    #[doc = "Create an index builder that will create documents"]
     fn prepare_index(index: str, typ: str) -> index_builder {
         mk_index_builder(self, index, typ)
     }
+
+    #[doc = "Create a search builder that will query elasticsearch"]
     fn prepare_search() -> search_builder {
         mk_search_builder(self)
     }
+
+    #[doc = "Delete a document"]
     fn delete(index: str, typ: str, id: str) -> response {
         let path = index + "/" + typ + "/" + id;
         self.transport.delete(path)
