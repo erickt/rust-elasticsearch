@@ -1,5 +1,4 @@
 import result::{ok, err};
-import std::io;
 import std::json;
 import std::map;
 import std::map::hashmap;
@@ -7,7 +6,7 @@ import zmq::{context, socket, error};
 
 import json = std::json::json;
 
-export transport, mk_zmq_transport;
+export transport, mk_zmq_transport, connect_with_zmq;
 export client, mk_client;
 export consistency;
 export CONSISTENCY_DEFAULT, ONE, QUORUM, ALL;
@@ -33,6 +32,7 @@ iface transport {
     fn put(path: str, source: hashmap<str, json>) -> response;
     fn post(path: str, source: hashmap<str, json>) -> response;
     fn delete(path: str) -> response;
+    fn term();
 }
 
 #[doc = "The high level interface to elasticsearch"]
@@ -64,6 +64,11 @@ impl client for client {
     fn delete(index: str, typ: str, id: str) -> response {
         let path = index + "/" + typ + "/" + id;
         self.transport.delete(path)
+    }
+
+    #[doc = "Shut down the transport"]
+    fn term() {
+        self.transport.term();
     }
 }
 
@@ -472,6 +477,9 @@ impl of transport for zmq_transport {
           err(e) { fail e.to_str(); }
         }
     }
+    fn term() {
+        self.socket.close();
+    }
 }
 
 #[doc = "Create a zeromq transport to Elasticsearch"]
@@ -481,11 +489,9 @@ fn mk_zmq_transport(ctx: zmq::context, addr: str) -> transport {
       err(e) { fail e.to_str() }
     };
 
-    str::as_bytes(addr) { |bytes|
-        alt socket.connect(bytes) {
-          ok(()) {}
-          err(e) { fail e.to_str(); }
-        }
+    alt socket.connect(addr) {
+      ok(()) {}
+      err(e) { fail e.to_str(); }
     }
 
     { socket: socket } as transport
