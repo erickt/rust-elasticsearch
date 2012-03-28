@@ -168,14 +168,14 @@ impl index_builder for index_builder {
         self
     }
     fn execute() -> response {
-        let path = [self.index, self.typ];
+        let mut path = [self.index, self.typ];
         alt self.id {
           none {}
           some(id) { vec::push(path, id); }
         }
 
-        let path = str::connect(path, "/");
-        let params = [];
+        let mut path = str::connect(path, "/");
+        let mut params = [];
 
         alt self.routing {
           none {}
@@ -229,7 +229,7 @@ impl index_builder for index_builder {
         }
 
         let source = alt self.source {
-          none { map::new_str_hash() }
+          none { map::str_hash() }
           some(source) { source }
         };
 
@@ -310,7 +310,7 @@ impl search_builder for search_builder {
         self
     }
     fn execute() -> response {
-        let path = [];
+        let mut path = [];
 
         alt self.index {
           none {}
@@ -323,10 +323,10 @@ impl search_builder for search_builder {
         }
 
         vec::push(path, "_search");
-        let path = str::connect(path, "/");
+        let mut path = str::connect(path, "/");
 
         // Build the query parameters.
-        let params = [];
+        let mut params = [];
 
         alt self.search_type {
           SEARCH_DEFAULT {}
@@ -359,7 +359,7 @@ impl search_builder for search_builder {
         }
 
         let source : hashmap<str, json> = alt self.source {
-          none {map::new_str_hash() }
+          none {map::str_hash() }
           some(source) { source }
         };
 
@@ -370,7 +370,7 @@ impl search_builder for search_builder {
 type json_dict_builder = hashmap<str, json>;
 
 fn mk_json_dict_builder() -> json_dict_builder {
-    map::new_str_hash()
+    map::str_hash()
 }
 
 impl json_dict_builder for json_dict_builder {
@@ -523,7 +523,7 @@ mod response {
     }
 
     fn parse_code(msg: [u8], end: uint) -> (uint, uint) {
-        alt vec::position_from(msg, 0u, end) { |c| c == '|' as u8 } {
+        alt vec::position_between(msg, 0u, end) { |c| c == '|' as u8 } {
           none { fail "invalid response" }
           some(i) {
             alt uint::parse_buf(vec::slice(msg, 0u, i), 10u) {
@@ -535,7 +535,7 @@ mod response {
     }
 
     fn parse_status(msg: [u8], start: uint, end: uint) -> (uint, str) {
-        alt vec::position_from(msg, start, end) { |c| c == '|' as u8 } {
+        alt vec::position_between(msg, start, end) { |c| c == '|' as u8 } {
           none { fail "invalid response" }
           some(i) { (i + 1u, str::from_bytes(vec::slice(msg, start, i))) }
         }
