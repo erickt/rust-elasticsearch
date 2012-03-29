@@ -6,8 +6,8 @@ import zmq::{context, socket, error};
 
 import json = std::json::json;
 
-export transport, mk_zmq_transport, connect_with_zmq;
-export client, mk_client;
+export transport, zmq_transport, connect_with_zmq;
+export client;
 export consistency;
 export CONSISTENCY_DEFAULT, ONE, QUORUM, ALL;
 export replication;
@@ -16,13 +16,13 @@ export op_type;
 export CREATE, INDEX;
 export version_type;
 export INTERNAL, EXTERNAL;
-export index_builder, mk_index_builder;
+export index_builder;
 export search_type;
 export SEARCH_DEFAULT, DFS_QUERY_THEN_FETCH, QUERY_THEN_FETCH;
 export DFS_QUERY_AND_FETCH, QUERY_AND_FETCH, SCAN, COUNT;
-export search_builder, mk_search_builder;
-export json_dict_builder, mk_json_dict_builder;
-export json_list_builder, mk_json_list_builder;
+export search_builder;
+export json_dict_builder;
+export json_list_builder;
 export response;
 
 #[doc = "The low level interface to elasticsearch"]
@@ -39,7 +39,7 @@ iface transport {
 type client = { transport: transport };
 
 #[doc = "Create an elasticsearch client"]
-fn mk_client(transport: transport) -> client {
+fn client(transport: transport) -> client {
     { transport: transport }
 }
 
@@ -52,12 +52,12 @@ impl client for client {
 
     #[doc = "Create an index builder that will create documents"]
     fn prepare_index(index: str, typ: str) -> index_builder {
-        mk_index_builder(self, index, typ)
+        index_builder(self, index, typ)
     }
 
     #[doc = "Create a search builder that will query elasticsearch"]
     fn prepare_search() -> search_builder {
-        mk_search_builder(self)
+        search_builder(self)
     }
 
     #[doc = "Delete a document"]
@@ -96,7 +96,7 @@ type index_builder = {
     mut source: option<hashmap<str, json>>,
 };
 
-fn mk_index_builder(client: client, index: str, typ: str) -> index_builder {
+fn index_builder(client: client, index: str, typ: str) -> index_builder {
     {
         client: client,
         index: index,
@@ -262,7 +262,7 @@ type search_builder = {
     mut source: option<hashmap<str, json>>,
 };
 
-fn mk_search_builder(client: client) -> search_builder {
+fn search_builder(client: client) -> search_builder {
     {
         client: client,
         mut index: none,
@@ -369,7 +369,7 @@ impl search_builder for search_builder {
 
 type json_dict_builder = hashmap<str, json>;
 
-fn mk_json_dict_builder() -> json_dict_builder {
+fn json_dict_builder() -> json_dict_builder {
     map::str_hash()
 }
 
@@ -392,13 +392,13 @@ impl json_dict_builder for json_dict_builder {
     }
     fn insert_dict(key: str, f: fn(json_dict_builder))
       -> json_dict_builder {
-        let builder = mk_json_dict_builder();
+        let builder = json_dict_builder();
         f(builder);
         self.insert(key, json::dict(builder));
         self
     }
     fn insert_list(key: str, f: fn(json_list_builder)) -> json_dict_builder {
-        let builder = mk_json_list_builder();
+        let builder = json_list_builder();
         f(builder);
         self.insert(key, json::list(*builder));
         self
@@ -412,7 +412,7 @@ impl json_dict_builder for json_dict_builder {
 
 type json_list_builder = @mut [json];
 
-fn mk_json_list_builder() -> json_list_builder {
+fn json_list_builder() -> json_list_builder {
     @mut []
 }
 
@@ -434,13 +434,13 @@ impl json_list_builder for json_list_builder {
         self
     }
     fn push_dict(f: fn(json_dict_builder)) -> json_list_builder {
-        let builder = mk_json_dict_builder();
+        let builder = json_dict_builder();
         f(builder);
         vec::push(*self, json::dict(builder));
         self
     }
     fn push_list(f: fn(json_list_builder)) -> json_list_builder {
-        let builder = mk_json_list_builder();
+        let builder = json_list_builder();
         f(builder);
         vec::push(*self, json::list(*builder));
         self
@@ -483,7 +483,7 @@ impl of transport for zmq_transport {
 }
 
 #[doc = "Create a zeromq transport to Elasticsearch"]
-fn mk_zmq_transport(ctx: zmq::context, addr: str) -> transport {
+fn zmq_transport(ctx: zmq::context, addr: str) -> transport {
     let socket = alt ctx.socket(zmq::REQ) {
       ok(socket) { socket }
       err(e) { fail e.to_str() }
@@ -499,8 +499,8 @@ fn mk_zmq_transport(ctx: zmq::context, addr: str) -> transport {
 
 #[doc = "Helper function to creating a client with zeromq"]
 fn connect_with_zmq(ctx: zmq::context, addr: str) -> client {
-    let transport = mk_zmq_transport(ctx, addr);
-    mk_client(transport)
+    let transport = zmq_transport(ctx, addr);
+    client(transport)
 }
 
 type response = {
@@ -571,7 +571,7 @@ mod tests {
         io::println(#fmt("%?\n", client.prepare_index("test", "test")
           .set_id("1")
           .set_version(2u)
-          .set_source(mk_json_dict_builder()
+          .set_source(json_dict_builder()
               .insert_float("foo", 5.0)
               .insert_str("bar", "wee")
               .insert_dict("baz") { |bld|
@@ -588,7 +588,7 @@ mod tests {
 
         io::println(#fmt("%?\n", client.prepare_search()
           .set_index("test")
-          .set_source(mk_json_dict_builder()
+          .set_source(json_dict_builder()
               .insert_strs("fields", ["foo", "bar"])
           )
           .execute()));
