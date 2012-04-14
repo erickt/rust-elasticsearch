@@ -511,8 +511,6 @@ type response = {
 
 mod response {
     fn parse(msg: [u8]) -> response {
-        io::println(#fmt("parse: %?", str::from_bytes(msg)));
-
         let end = vec::len(msg);
 
         let (start, code) = parse_code(msg, end);
