@@ -322,15 +322,8 @@ impl search_builder for search_builder {
     fn execute() -> response {
         let mut path = [];
 
-        alt self.index {
-          none {}
-          some(index) { vec::push(path, index); }
-        }
-
-        alt self.typ {
-          none {}
-          some(typ) { vec::push(path, typ); }
-        }
+        self.index.iter { |index| vec::push(path, index); }
+        self.typ.iter { |typ| vec::push(path, typ); }
 
         vec::push(path, "_search");
         let mut path = str::connect(path, "/");
@@ -354,14 +347,8 @@ impl search_builder for search_builder {
           COUNT { vec::push(params, "search_type=count"); }
         }
 
-        alt self.scroll {
-          none {}
-          some(scroll) { vec::push(params, "scroll=" + scroll); }
-        }
-
-        alt self.scroll {
-          none {}
-          some(scroll) { vec::push(params, "scroll=" + scroll); }
+        self.scroll.iter { |scroll|
+            vec::push(params, "scroll=" + scroll);
         }
 
         if vec::is_not_empty(params) {
