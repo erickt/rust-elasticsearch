@@ -88,7 +88,7 @@ type index_builder = {
     mut ttl: option<str>,
     mut op_type: op_type,
     mut refresh: bool,
-    mut version: uint,
+    mut version: option<uint>,
     mut version_type: version_type,
     mut percolate: option<str>,
     mut consistency: consistency,
@@ -108,7 +108,7 @@ fn index_builder(client: client, index: str, typ: str) -> index_builder {
         mut ttl: none,
         mut op_type: INDEX,
         mut refresh: false,
-        mut version: 0u,
+        mut version: none,
         mut version_type: INTERNAL,
         mut percolate: none,
         mut consistency: CONSISTENCY_DEFAULT,
@@ -144,7 +144,7 @@ impl index_builder for index_builder {
         self
     }
     fn set_version(version: uint) -> index_builder {
-        self.version = version;
+        self.version = some(version);
         self
     }
     fn set_version_type(version_type: version_type) -> index_builder {
@@ -204,6 +204,16 @@ impl index_builder for index_builder {
 
         if self.refresh {
             vec::push(params, "refresh=true");
+        }
+
+        alt self.version {
+          none {}
+          some(version) { vec::push(params, #fmt("version=%u", version)); }
+        }
+
+        alt self.version_type {
+          INTERNAL {}
+          EXTERNAL { vec::push(params, "version_type=external"); }
         }
 
         alt self.percolate {
