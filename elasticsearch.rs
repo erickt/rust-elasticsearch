@@ -244,8 +244,8 @@ impl index_builder for index_builder {
         };
 
         alt self.id {
-          none { self.client.transport.put(path, source) }
-          some(_) { self.client.transport.post(path, source) }
+          none { self.client.transport.post(path, source) }
+          some(_) { self.client.transport.put(path, source) }
         }
     }
 }
