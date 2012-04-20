@@ -15,6 +15,7 @@ export version_type;
 export index_builder;
 export search_type;
 export search_builder;
+export delete_builder;
 export delete_by_query_builder;
 export json_dict_builder;
 export json_list_builder;
@@ -57,8 +58,16 @@ impl client for client {
 
     #[doc = "Delete a document"]
     fn delete(index: str, typ: str, id: str) -> response {
-        let path = index + "/" + typ + "/" + id;
-        self.transport.delete(path, none)
+        self.prepare_delete()
+            .set_indices([index])
+            .set_types([typ])
+            .set_id(id)
+            .execute()
+    }
+
+    #[doc = "Delete a document"]
+    fn prepare_delete() -> delete_builder {
+        delete_builder(self)
     }
 
     #[doc = "Create a search builder that will query elasticsearch"]
@@ -336,6 +345,123 @@ impl search_builder for search_builder {
         };
 
         self.client.transport.post(path, source)
+    }
+}
+
+type delete_builder = {
+    client: client,
+    mut indices: [str],
+    mut types: [str],
+    mut id: option<str>,
+
+    mut consistency: consistency,
+    mut refresh: bool,
+    mut replication: replication,
+    mut routing: option<str>,
+    mut timeout: option<str>,
+    mut version: option<uint>,
+    mut version_type: version_type
+};
+
+fn delete_builder(client: client) -> delete_builder {
+    {
+        client: client,
+        mut indices: [],
+        mut types: [],
+        mut id: none,
+        mut consistency: CONSISTENCY_DEFAULT,
+        mut refresh: false,
+        mut replication: REPLICATION_DEFAULT,
+        mut routing: none,
+        mut timeout: none,
+        mut version: none,
+        mut version_type: INTERNAL
+    }
+}
+
+impl delete_builder for delete_builder {
+    fn set_indices(indices: [str]) -> delete_builder {
+        self.indices = indices;
+        self
+    }
+    fn set_types(types: [str]) -> delete_builder {
+        self.types = types;
+        self
+    }
+    fn set_id(id: str) -> delete_builder {
+        self.id = some(id);
+        self
+    }
+    fn set_consistency(consistency: consistency) -> delete_builder {
+        self.consistency = consistency;
+        self
+    }
+    fn set_refresh(refresh: bool) -> delete_builder {
+        self.refresh = refresh;
+        self
+    }
+    fn set_replication(replication: replication) -> delete_builder {
+        self.replication = replication;
+        self
+    }
+    fn set_routing(routing: str) -> delete_builder {
+        self.routing = some(routing);
+        self
+    }
+    fn set_timeout(timeout: str) -> delete_builder {
+        self.timeout = some(timeout);
+        self
+    }
+    fn set_version(version: uint) -> delete_builder {
+        self.version = some(version);
+        self
+    }
+    fn set_version_type(version_type: version_type) -> delete_builder {
+        self.version_type = version_type;
+        self
+    }
+    fn execute() -> response {
+        let mut path = [];
+
+        vec::push(path, str::connect(self.indices, ","));
+        vec::push(path, str::connect(self.types, ","));
+        self.id.iter { |id| vec::push(path, id); }
+
+        let mut path = str::connect(path, "/");
+
+        // Build the query parameters.
+        let mut params = [];
+
+        alt self.consistency {
+          CONSISTENCY_DEFAULT {}
+          ONE { vec::push(params, "consistency=one"); }
+          QUORUM { vec::push(params, "consistency=quorum"); }
+          ALL { vec::push(params, "consistency=all"); }
+        }
+
+        if self.refresh { vec::push(params, "refresh=true"); }
+
+        alt self.replication {
+          REPLICATION_DEFAULT {}
+          SYNC { vec::push(params, "replication=sync"); }
+          ASYNC { vec::push(params, "replication=async"); }
+        }
+
+        self.routing.iter { |s| vec::push(params, "routing=" + s); }
+        self.timeout.iter { |s| vec::push(params, "timeout=" + s); }
+
+        self.version.iter   { |i| vec::push(params, #fmt("version=%u", i)); }
+
+        alt self.version_type {
+          INTERNAL {}
+          EXTERNAL { vec::push(params, "version_type=external"); }
+        }
+
+        if vec::is_not_empty(params) {
+            path += "?" + str::connect(params, "&");
+        }
+
+        self.client.transport.delete(path, none)
     }
 }
 
