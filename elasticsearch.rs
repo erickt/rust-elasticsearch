@@ -15,6 +15,7 @@ export version_type;
 export index_builder;
 export search_type;
 export search_builder;
+export delete_by_query_builder;
 export json_dict_builder;
 export json_list_builder;
 export response;
@@ -25,7 +26,7 @@ iface transport {
     fn get(path: str) -> response;
     fn put(path: str, source: hashmap<str, json>) -> response;
     fn post(path: str, source: hashmap<str, json>) -> response;
-    fn delete(path: str) -> response;
+    fn delete(path: str, source: option<hashmap<str, json>>) -> response;
     fn term();
 }
 
@@ -57,7 +58,12 @@ impl client for client {
     #[doc = "Delete a document"]
     fn delete(index: str, typ: str, id: str) -> response {
         let path = index + "/" + typ + "/" + id;
-        self.transport.delete(path)
+        self.transport.delete(path, none)
+    }
+
+    #[doc = "Create a search builder that will query elasticsearch"]
+    fn prepare_delete_by_query() -> delete_by_query_builder {
+        delete_by_query_builder(self)
     }
 
     #[doc = "Shut down the transport"]
@@ -333,6 +339,95 @@ impl search_builder for search_builder {
     }
 }
 
+type delete_by_query_builder = {
+    client: client,
+    mut indices: [str],
+    mut types: [str],
+    mut routing: option<str>,
+    mut timeout: option<str>,
+    mut consistency: consistency,
+    mut replication: replication,
+    mut source: option<hashmap<str, json>>,
+};
+
+fn delete_by_query_builder(client: client) -> delete_by_query_builder {
+    {
+        client: client,
+        mut indices: [],
+        mut types: [],
+        mut routing: none,
+        mut timeout: none,
+        mut consistency: CONSISTENCY_DEFAULT,
+        mut replication: REPLICATION_DEFAULT,
+        mut source: none,
+    }
+}
+
+impl delete_by_query_builder for delete_by_query_builder {
+    fn set_indices(indices: [str]) -> delete_by_query_builder {
+        self.indices = indices;
+        self
+    }
+    fn set_types(types: [str]) -> delete_by_query_builder {
+        self.types = types;
+        self
+    }
+    fn set_routing(routing: str) -> delete_by_query_builder {
+        self.routing = some(routing);
+        self
+    }
+    fn set_timeout(timeout: str) -> delete_by_query_builder {
+        self.timeout = some(timeout);
+        self
+    }
+    fn set_consistency(consistency: consistency) -> delete_by_query_builder {
+        self.consistency = consistency;
+        self
+    }
+    fn set_replication(replication: replication) -> delete_by_query_builder {
+        self.replication = replication;
+        self
+    }
+    fn set_source(source: hashmap<str, json>) -> delete_by_query_builder {
+        self.source = some(source);
+        self
+    }
+    fn execute() -> response {
+        let mut path = [];
+
+        vec::push(path, str::connect(self.indices, ","));
+        vec::push(path, str::connect(self.types, ","));
+        vec::push(path, "_query");
+
+        let mut path = str::connect(path, "/");
+
+        // Build the query parameters.
+        let mut params = [];
+
+        self.routing.iter { |routing| vec::push(params, "routing=" + routing); }
+        self.timeout.iter { |timeout| vec::push(params, "timeout=" + timeout); }
+
+        alt self.consistency {
+          CONSISTENCY_DEFAULT {}
+          ONE { vec::push(params, "consistency=one"); }
+          QUORUM { vec::push(params, "consistency=quorum"); }
+          ALL { vec::push(params, "consistency=all"); }
+        }
+
+        alt self.replication {
+          REPLICATION_DEFAULT {}
+          SYNC { vec::push(params, "replication=sync"); }
+          ASYNC { vec::push(params, "replication=async"); }
+        }
+
+        if vec::is_not_empty(params) {
+            path += "?" + str::connect(params, "&");
+        }
+
+        self.client.transport.delete(path, self.source)
+    }
+}
+
 type json_dict_builder = hashmap<str, json>;
 
 fn json_dict_builder() -> json_dict_builder {
@@ -426,8 +521,13 @@ impl of transport for zmq_transport {
     fn post(path: str, source: hashmap<str, json>) -> response {
         self.send("POST|" + path + "|" + json::to_str(json::dict(source)))
     }
-    fn delete(path: str) -> response {
-        self.send("DELETE|" + path)
+    fn delete(path: str, source: option<hashmap<str, json>>) -> response {
+        alt source {
+          none { self.send("DELETE|" + path) }
+          some(source) {
+            self.send("DELETE|" + path + "|" + json::to_str(json::dict(source)))
+          }
+        }
     }
 
     fn send(request: str) -> response {
@@ -558,5 +658,22 @@ mod tests {
           .execute()));
 
         io::println(#fmt("%?\n", client.delete("test", "test", "1")));
+
+        io::println(#fmt("%?\n", client.prepare_index("test", "test")
+          .set_id("2")
+          .set_source(json_dict_builder()
+              .insert_str("bar", "lala")
+          )
+          .set_refresh(true)
+          .execute()));
+
+        io::println(#fmt("%?\n", client.prepare_delete_by_query()
+          .set_indices(["test"])
+          .set_source(json_dict_builder()
+              .insert_dict("term") { |bld|
+                  bld.insert_str("bar", "lala");
+              }
+          )
+          .execute()));
     }
 }
