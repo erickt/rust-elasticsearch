@@ -91,17 +91,20 @@ type index_builder = {
     index: str,
     typ: str,
     mut id: option<str>,
-    mut routing: option<str>,
+
+    mut consistency: consistency,
+    mut op_type: op_type,
     mut parent: option<str>,
+    mut percolate: option<str>,
+    mut refresh: bool,
+    mut replication: replication,
+    mut routing: option<str>,
+    mut timeout: option<str>,
     mut timestamp: option<str>,
     mut ttl: option<str>,
-    mut op_type: op_type,
-    mut refresh: bool,
     mut version: option<uint>,
     mut version_type: version_type,
-    mut percolate: option<str>,
-    mut consistency: consistency,
-    mut replication: replication,
+
     mut source: option<hashmap<str, json>>,
 };
 
@@ -111,29 +114,59 @@ fn index_builder(client: client, index: str, typ: str) -> index_builder {
         index: index,
         typ: typ,
         mut id: none,
-        mut routing: none,
+
+        mut consistency: CONSISTENCY_DEFAULT,
+        mut op_type: INDEX,
         mut parent: none,
+        mut percolate: none,
+        mut refresh: false,
+        mut replication: REPLICATION_DEFAULT,
+        mut routing: none,
+        mut timeout: none,
         mut timestamp: none,
         mut ttl: none,
-        mut op_type: INDEX,
-        mut refresh: false,
         mut version: none,
         mut version_type: INTERNAL,
-        mut percolate: none,
-        mut consistency: CONSISTENCY_DEFAULT,
-        mut replication: REPLICATION_DEFAULT,
+
         mut source: none,
     }
 }
 
 impl index_builder for index_builder {
-    fn set_id(id: str) -> index_builder { self.id = some(id); self }
-    fn set_routing(routing: str) -> index_builder {
-        self.routing = some(routing);
+    fn set_id(id: str) -> index_builder {
+        self.id = some(id);
+        self
+    }
+    fn set_consistency(consistency: consistency) -> index_builder {
+        self.consistency = consistency;
+        self
+    }
+    fn set_op_type(op_type: op_type) -> index_builder {
+        self.op_type = op_type;
         self
     }
     fn set_parent(parent: str) -> index_builder {
         self.parent = some(parent);
+        self
+    }
+    fn set_percolate(percolate: str) -> index_builder {
+        self.percolate = some(percolate);
+        self
+    }
+    fn set_refresh(refresh: bool) -> index_builder {
+        self.refresh = refresh;
+        self
+    }
+    fn set_replication(replication: replication) -> index_builder {
+        self.replication = replication;
+        self
+    }
+    fn set_routing(routing: str) -> index_builder {
+        self.routing = some(routing);
+        self
+    }
+    fn set_timeout(timeout: str) -> index_builder {
+        self.timeout = some(timeout);
         self
     }
     fn set_timestamp(timestamp: str) -> index_builder {
@@ -144,32 +177,12 @@ impl index_builder for index_builder {
         self.ttl = some(ttl);
         self
     }
-    fn set_op_type(op_type: op_type) -> index_builder {
-        self.op_type = op_type;
-        self
-    }
-    fn set_refresh(refresh: bool) -> index_builder {
-        self.refresh = refresh;
-        self
-    }
     fn set_version(version: uint) -> index_builder {
         self.version = some(version);
         self
     }
     fn set_version_type(version_type: version_type) -> index_builder {
         self.version_type = version_type;
-        self
-    }
-    fn set_percolate(percolate: str) -> index_builder {
-        self.percolate = some(percolate);
-        self
-    }
-    fn set_consistency(consistency: consistency) -> index_builder {
-        self.consistency = consistency;
-        self
-    }
-    fn set_replication(replication: replication) -> index_builder {
-        self.replication = replication;
         self
     }
     fn set_source(source: hashmap<str, json>) -> index_builder {
@@ -183,27 +196,6 @@ impl index_builder for index_builder {
         let mut path = str::connect(path, "/");
         let mut params = [];
 
-        self.routing.iter   { |s| vec::push(params, "routing=" + s); }
-        self.parent.iter    { |s| vec::push(params, "parent=" + s); }
-        self.timestamp.iter { |s| vec::push(params, "timestamp=" + s); }
-        self.ttl.iter       { |s| vec::push(params, "ttl=" + s); }
-        self.version.iter   { |i| vec::push(params, #fmt("version=%u", i)); }
-        self.percolate.iter { |s| vec::push(params, "percolate=" + s); }
-
-        alt self.op_type {
-          CREATE { vec::push(params, "op_type=create"); }
-          INDEX {}
-        }
-
-        if self.refresh {
-            vec::push(params, "refresh=true");
-        }
-
-        alt self.version_type {
-          INTERNAL {}
-          EXTERNAL { vec::push(params, "version_type=external"); }
-        }
-
         alt self.consistency {
           CONSISTENCY_DEFAULT {}
           ONE { vec::push(params, "consistency=one"); }
@@ -211,10 +203,31 @@ impl index_builder for index_builder {
           ALL { vec::push(params, "consistency=all"); }
         }
 
+        alt self.op_type {
+          CREATE { vec::push(params, "op_type=create"); }
+          INDEX {}
+        }
+
+        self.parent.iter    { |s| vec::push(params, "parent=" + s); }
+        self.percolate.iter { |s| vec::push(params, "percolate=" + s); }
+
+        if self.refresh { vec::push(params, "refresh=true"); }
+
         alt self.replication {
           REPLICATION_DEFAULT {}
           SYNC { vec::push(params, "replication=sync"); }
           ASYNC { vec::push(params, "replication=async"); }
+        }
+
+        self.routing.iter   { |s| vec::push(params, "routing=" + s); }
+        self.timeout.iter   { |s| vec::push(params, "timeout=" + s); }
+        self.timestamp.iter { |s| vec::push(params, "timestamp=" + s); }
+        self.ttl.iter       { |s| vec::push(params, "ttl=" + s); }
+        self.version.iter   { |i| vec::push(params, #fmt("version=%u", i)); }
+
+        alt self.version_type {
+          INTERNAL {}
+          EXTERNAL { vec::push(params, "version_type=external"); }
         }
 
         if vec::is_not_empty(params) {
@@ -247,11 +260,13 @@ type search_builder = {
     client: client,
     mut indices: [str],
     mut types: [str],
-    mut search_type: search_type,
-    mut scroll: option<str>,
-    mut timeout: option<str>,
-    mut routing: option<str>,
+
     mut preference: option<str>,
+    mut routing: option<str>,
+    mut scroll: option<str>,
+    mut search_type: search_type,
+    mut timeout: option<str>,
+
     mut source: option<hashmap<str, json>>
 };
 
@@ -260,11 +275,13 @@ fn search_builder(client: client) -> search_builder {
         client: client,
         mut indices: [],
         mut types: [],
-        mut search_type: SEARCH_DEFAULT,
-        mut scroll: none,
-        mut timeout: none,
-        mut routing: none,
+
         mut preference: none,
+        mut routing: none,
+        mut scroll: none,
+        mut search_type: SEARCH_DEFAULT,
+        mut timeout: none,
+
         mut source: none
     }
 }
@@ -278,24 +295,24 @@ impl search_builder for search_builder {
         self.types = types;
         self
     }
-    fn set_search_type(search_type: search_type) -> search_builder {
-        self.search_type = search_type;
-        self
-    }
-    fn set_scroll(scroll: str) -> search_builder {
-        self.scroll = some(scroll);
+    fn set_preference(preference: str) -> search_builder {
+        self.preference = some(preference);
         self
     }
     fn set_routing(routing: str) -> search_builder {
         self.routing = some(routing);
         self
     }
-    fn set_timeout(timeout: str) -> search_builder {
-        self.timeout = some(timeout);
+    fn set_scroll(scroll: str) -> search_builder {
+        self.scroll = some(scroll);
         self
     }
-    fn set_preference(preference: str) -> search_builder {
-        self.preference = some(preference);
+    fn set_search_type(search_type: search_type) -> search_builder {
+        self.search_type = search_type;
+        self
+    }
+    fn set_timeout(timeout: str) -> search_builder {
+        self.timeout = some(timeout);
         self
     }
     fn set_source(source: hashmap<str, json>) -> search_builder {
@@ -314,6 +331,10 @@ impl search_builder for search_builder {
         // Build the query parameters.
         let mut params = [];
 
+        self.preference.iter { |s| vec::push(params, "preference=" + s); }
+        self.routing.iter    { |s| vec::push(params, "routing=" + s); }
+        self.scroll.iter     { |s| vec::push(params, "scroll=" + s) }
+
         alt self.search_type {
           SEARCH_DEFAULT {}
           DFS_QUERY_THEN_FETCH {
@@ -330,10 +351,7 @@ impl search_builder for search_builder {
           COUNT { vec::push(params, "search_type=count"); }
         }
 
-        self.scroll.iter     { |s| vec::push(params, "scroll=" + s) }
-        self.routing.iter    { |s| vec::push(params, "routing=" + s); }
-        self.timeout.iter    { |s| vec::push(params, "timeout=" + s); }
-        self.preference.iter { |s| vec::push(params, "preference=" + s); }
+        self.timeout.iter { |s| vec::push(params, "timeout=" + s); }
 
         if vec::is_not_empty(params) {
             path += "?" + str::connect(params, "&");
@@ -394,6 +412,11 @@ impl delete_builder for delete_builder {
     }
     fn set_consistency(consistency: consistency) -> delete_builder {
         self.consistency = consistency;
+        self
+    }
+    fn set_parent(parent: str) -> delete_builder {
+        // We use the parent for routing.
+        self.routing = some(parent);
         self
     }
     fn set_refresh(refresh: bool) -> delete_builder {
@@ -469,10 +492,13 @@ type delete_by_query_builder = {
     client: client,
     mut indices: [str],
     mut types: [str],
+
+    mut consistency: consistency,
+    mut refresh: bool,
+    mut replication: replication,
     mut routing: option<str>,
     mut timeout: option<str>,
-    mut consistency: consistency,
-    mut replication: replication,
+
     mut source: option<hashmap<str, json>>,
 };
 
@@ -481,10 +507,13 @@ fn delete_by_query_builder(client: client) -> delete_by_query_builder {
         client: client,
         mut indices: [],
         mut types: [],
+
+        mut consistency: CONSISTENCY_DEFAULT,
+        mut refresh: false,
+        mut replication: REPLICATION_DEFAULT,
         mut routing: none,
         mut timeout: none,
-        mut consistency: CONSISTENCY_DEFAULT,
-        mut replication: REPLICATION_DEFAULT,
+
         mut source: none,
     }
 }
@@ -498,20 +527,24 @@ impl delete_by_query_builder for delete_by_query_builder {
         self.types = types;
         self
     }
+    fn set_consistency(consistency: consistency) -> delete_by_query_builder {
+        self.consistency = consistency;
+        self
+    }
+    fn set_refresh(refresh: bool) -> delete_by_query_builder {
+        self.refresh = refresh;
+        self
+    }
+    fn set_replication(replication: replication) -> delete_by_query_builder {
+        self.replication = replication;
+        self
+    }
     fn set_routing(routing: str) -> delete_by_query_builder {
         self.routing = some(routing);
         self
     }
     fn set_timeout(timeout: str) -> delete_by_query_builder {
         self.timeout = some(timeout);
-        self
-    }
-    fn set_consistency(consistency: consistency) -> delete_by_query_builder {
-        self.consistency = consistency;
-        self
-    }
-    fn set_replication(replication: replication) -> delete_by_query_builder {
-        self.replication = replication;
         self
     }
     fn set_source(source: hashmap<str, json>) -> delete_by_query_builder {
@@ -530,9 +563,6 @@ impl delete_by_query_builder for delete_by_query_builder {
         // Build the query parameters.
         let mut params = [];
 
-        self.routing.iter { |routing| vec::push(params, "routing=" + routing); }
-        self.timeout.iter { |timeout| vec::push(params, "timeout=" + timeout); }
-
         alt self.consistency {
           CONSISTENCY_DEFAULT {}
           ONE { vec::push(params, "consistency=one"); }
@@ -540,11 +570,16 @@ impl delete_by_query_builder for delete_by_query_builder {
           ALL { vec::push(params, "consistency=all"); }
         }
 
+        if self.refresh { vec::push(params, "refresh=true"); }
+
         alt self.replication {
           REPLICATION_DEFAULT {}
           SYNC { vec::push(params, "replication=sync"); }
           ASYNC { vec::push(params, "replication=async"); }
         }
+
+        self.routing.iter { |routing| vec::push(params, "routing=" + routing); }
+        self.timeout.iter { |timeout| vec::push(params, "timeout=" + timeout); }
 
         if vec::is_not_empty(params) {
             path += "?" + str::connect(params, "&");
