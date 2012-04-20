@@ -163,56 +163,30 @@ impl index_builder for index_builder {
     }
     fn execute() -> response {
         let mut path = [self.index, self.typ];
-        alt self.id {
-          none {}
-          some(id) { vec::push(path, id); }
-        }
+        self.id.iter { |id| vec::push(path, id); }
 
         let mut path = str::connect(path, "/");
         let mut params = [];
 
-        alt self.routing {
-          none {}
-          some(routing) { vec::push(params, "routing=" + routing); }
-        }
-
-        alt self.parent {
-          none {}
-          some(parent) { vec::push(params, "parent=" + parent); }
-        }
-
-        alt self.timestamp {
-          none {}
-          some(timestamp) { vec::push(params, "timestamp=" + timestamp); }
-        }
-
-        alt self.ttl {
-          none {}
-          some(ttl) { vec::push(params, "ttl=" + ttl); }
-        }
+        self.routing.iter   { |s| vec::push(params, "routing=" + s); }
+        self.parent.iter    { |s| vec::push(params, "parent=" + s); }
+        self.timestamp.iter { |s| vec::push(params, "timestamp=" + s); }
+        self.ttl.iter       { |s| vec::push(params, "ttl=" + s); }
+        self.version.iter   { |i| vec::push(params, #fmt("version=%u", i)); }
+        self.percolate.iter { |s| vec::push(params, "percolate=" + s); }
 
         alt self.op_type {
           CREATE { vec::push(params, "op_type=create"); }
-          INDEX { vec::push(params, "op_type=index"); }
+          INDEX {}
         }
 
         if self.refresh {
             vec::push(params, "refresh=true");
         }
 
-        alt self.version {
-          none {}
-          some(version) { vec::push(params, #fmt("version=%u", version)); }
-        }
-
         alt self.version_type {
           INTERNAL {}
           EXTERNAL { vec::push(params, "version_type=external"); }
-        }
-
-        alt self.percolate {
-          none {}
-          some(percolate) { vec::push(params, "percolate=" + percolate); }
         }
 
         alt self.consistency {
