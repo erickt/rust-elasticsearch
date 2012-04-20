@@ -230,37 +230,37 @@ enum search_type {
 
 type search_builder = {
     client: client,
-    mut index: option<str>,
-    mut typ: option<str>,
+    mut indices: [str],
+    mut types: [str],
     mut search_type: search_type,
     mut scroll: option<str>,
-    mut query_hint: option<str>,
+    mut timeout: option<str>,
     mut routing: option<str>,
     mut preference: option<str>,
-    mut source: option<hashmap<str, json>>,
+    mut source: option<hashmap<str, json>>
 };
 
 fn search_builder(client: client) -> search_builder {
     {
         client: client,
-        mut index: none,
-        mut typ: none,
+        mut indices: [],
+        mut types: [],
         mut search_type: SEARCH_DEFAULT,
         mut scroll: none,
-        mut query_hint: none,
+        mut timeout: none,
         mut routing: none,
         mut preference: none,
-        mut source: none,
+        mut source: none
     }
 }
 
 impl search_builder for search_builder {
-    fn set_index(index: str) -> search_builder {
-        self.index = some(index);
+    fn set_indices(indices: [str]) -> search_builder {
+        self.indices = indices;
         self
     }
-    fn set_type(typ: str) -> search_builder {
-        self.typ = some(typ);
+    fn set_types(types: [str]) -> search_builder {
+        self.types = types;
         self
     }
     fn set_search_type(search_type: search_type) -> search_builder {
@@ -271,12 +271,12 @@ impl search_builder for search_builder {
         self.scroll = some(scroll);
         self
     }
-    fn set_query_hint(query_hint: str) -> search_builder {
-        self.query_hint = some(query_hint);
-        self
-    }
     fn set_routing(routing: str) -> search_builder {
         self.routing = some(routing);
+        self
+    }
+    fn set_timeout(timeout: str) -> search_builder {
+        self.timeout = some(timeout);
         self
     }
     fn set_preference(preference: str) -> search_builder {
@@ -290,10 +290,10 @@ impl search_builder for search_builder {
     fn execute() -> response {
         let mut path = [];
 
-        self.index.iter { |index| vec::push(path, index); }
-        self.typ.iter { |typ| vec::push(path, typ); }
-
+        vec::push(path, str::connect(self.indices, ","));
+        vec::push(path, str::connect(self.types, ","));
         vec::push(path, "_search");
+
         let mut path = str::connect(path, "/");
 
         // Build the query parameters.
@@ -315,16 +315,17 @@ impl search_builder for search_builder {
           COUNT { vec::push(params, "search_type=count"); }
         }
 
-        self.scroll.iter { |scroll|
-            vec::push(params, "scroll=" + scroll);
-        }
+        self.scroll.iter     { |s| vec::push(params, "scroll=" + s) }
+        self.routing.iter    { |s| vec::push(params, "routing=" + s); }
+        self.timeout.iter    { |s| vec::push(params, "timeout=" + s); }
+        self.preference.iter { |s| vec::push(params, "preference=" + s); }
 
         if vec::is_not_empty(params) {
             path += "?" + str::connect(params, "&");
         }
 
         let source : hashmap<str, json> = alt self.source {
-          none {map::str_hash() }
+          none { map::str_hash() }
           some(source) { source }
         };
 
@@ -550,7 +551,7 @@ mod tests {
         io::println(#fmt("%?\n", client.get("test", "test", "1")));
 
         io::println(#fmt("%?\n", client.prepare_search()
-          .set_index("test")
+          .set_indices(["test"])
           .set_source(json_dict_builder()
               .insert_strs("fields", ["foo", "bar"])
           )
