@@ -531,6 +531,8 @@ impl of transport for zmq_transport {
     }
 
     fn send(request: str) -> response {
+        #debug("request: %s", request);
+
         str::as_bytes(request) { |bytes|
             alt self.socket.send_between(bytes, 0u, str::len(request), 0) {
               ok(()) {}
@@ -539,7 +541,10 @@ impl of transport for zmq_transport {
         }
 
         alt self.socket.recv(0) {
-          ok(msg) { response::parse(msg) }
+          ok(msg) {
+            #debug("response: %s", str::from_bytes(msg));
+            response::parse(msg)
+          }
           err(e) { fail e.to_str(); }
         }
     }
