@@ -12,6 +12,8 @@ export consistency;
 export replication;
 export op_type;
 export version_type;
+export create_index_builder;
+export delete_index_builder;
 export index_builder;
 export search_type;
 export search_builder;
@@ -40,6 +42,16 @@ fn client(transport: transport) -> client {
 }
 
 impl client for client {
+    #[doc = "Create an index"]
+    fn prepare_create_index(index: str) -> create_index_builder {
+        create_index_builder(self, index)
+    }
+
+    #[doc = "Delete indices"]
+    fn prepare_delete_index() -> delete_index_builder {
+        delete_index_builder(self)
+    }
+
     #[doc = "Get a specific document"]
     fn get(index: str, typ: str, id: str) -> response {
         let path = index + "/" + typ + "/" + id;
@@ -58,16 +70,12 @@ impl client for client {
 
     #[doc = "Delete a document"]
     fn delete(index: str, typ: str, id: str) -> response {
-        self.prepare_delete()
-            .set_indices([index])
-            .set_types([typ])
-            .set_id(id)
-            .execute()
+        self.prepare_delete(index, typ, id).execute()
     }
 
     #[doc = "Delete a document"]
-    fn prepare_delete() -> delete_builder {
-        delete_builder(self)
+    fn prepare_delete(index: str, typ: str, id: str) -> delete_builder {
+        delete_builder(self, index, typ, id)
     }
 
     #[doc = "Create a search builder that will query elasticsearch"]
@@ -85,6 +93,94 @@ enum consistency { CONSISTENCY_DEFAULT, ONE, QUORUM, ALL }
 enum replication { REPLICATION_DEFAULT, SYNC, ASYNC }
 enum op_type { CREATE, INDEX }
 enum version_type { INTERNAL, EXTERNAL }
+
+type create_index_builder = {
+    client: client,
+    index: str,
+
+    mut timeout: option<str>,
+
+    mut source: option<hashmap<str, json>>
+};
+
+fn create_index_builder(client: client, index: str) -> create_index_builder {
+    {
+        client: client,
+        index: index,
+
+        mut timeout: none,
+
+        mut source: none,
+    }
+}
+
+impl create_index_builder for create_index_builder {
+    fn set_timeout(timeout: str) -> create_index_builder {
+        self.timeout = some(timeout);
+        self
+    }
+    fn set_source(source: hashmap<str, json>) -> create_index_builder {
+        self.source = some(source);
+        self
+    }
+    fn execute() -> response {
+        let mut path = self.index;
+
+        let mut params = [];
+
+        self.timeout.iter { |s| vec::push(params, "timeout=" + s); }
+
+        if vec::is_not_empty(params) {
+            path += "?" + str::connect(params, "&");
+        }
+
+        let source = alt self.source {
+          none { map::str_hash() }
+          some(source) { source }
+        };
+
+        self.client.transport.put(path, source)
+    }
+}
+
+type delete_index_builder = {
+    client: client,
+    mut indices: [str],
+    mut timeout: option<str>,
+};
+
+fn delete_index_builder(client: client) -> delete_index_builder {
+    {
+        client: client,
+        mut indices: [],
+        mut timeout: none,
+    }
+}
+
+impl delete_index_builder for delete_index_builder {
+    fn set_indices(indices: [str]) -> delete_index_builder {
+        self.indices = indices;
+        self
+    }
+    fn set_timeout(timeout: str) -> delete_index_builder {
+        self.timeout = some(timeout);
+        self
+    }
+    fn execute() -> response {
+        let mut path = str::connect(self.indices, ",");
+
+        // Build the query parameters.
+        let mut params = [];
+
+        self.timeout.iter { |timeout| vec::push(params, "timeout=" + timeout); }
+
+        if vec::is_not_empty(params) {
+            path += "?" + str::connect(params, "&");
+        }
+
+        self.client.transport.delete(path, none)
+    }
+}
 
 type index_builder = {
     client: client,
@@ -368,9 +464,9 @@ impl search_builder for search_builder {
 
 type delete_builder = {
     client: client,
-    mut indices: [str],
-    mut types: [str],
-    mut id: option<str>,
+    index: str,
+    typ: str,
+    id: str,
 
     mut consistency: consistency,
     mut refresh: bool,
@@ -381,12 +477,12 @@ type delete_builder = {
     mut version_type: version_type
 };
 
-fn delete_builder(client: client) -> delete_builder {
+fn delete_builder(client: client, index: str, typ: str, id: str) -> delete_builder {
     {
         client: client,
-        mut indices: [],
-        mut types: [],
-        mut id: none,
+        index: index,
+        typ: typ,
+        id: id,
         mut consistency: CONSISTENCY_DEFAULT,
         mut refresh: false,
         mut replication: REPLICATION_DEFAULT,
@@ -398,18 +494,6 @@ fn delete_builder(client: client) -> delete_builder {
 }
 
 impl delete_builder for delete_builder {
-    fn set_indices(indices: [str]) -> delete_builder {
-        self.indices = indices;
-        self
-    }
-    fn set_types(types: [str]) -> delete_builder {
-        self.types = types;
-        self
-    }
-    fn set_id(id: str) -> delete_builder {
-        self.id = some(id);
-        self
-    }
     fn set_consistency(consistency: consistency) -> delete_builder {
         self.consistency = consistency;
         self
@@ -444,13 +528,7 @@ impl delete_builder for delete_builder {
         self
     }
     fn execute() -> response {
-        let mut path = [];
-
-        vec::push(path, str::connect(self.indices, ","));
-        vec::push(path, str::connect(self.types, ","));
-        self.id.iter { |id| vec::push(path, id); }
-
-        let mut path = str::connect(path, "/");
+        let mut path = self.index + "/" + self.typ + "/" + self.id;
 
         // Build the query parameters.
         let mut params = [];
@@ -596,6 +674,12 @@ fn json_dict_builder() -> json_dict_builder {
 }
 
 impl json_dict_builder for json_dict_builder {
+    fn insert_int(key: str, value: int) -> json_dict_builder {
+        self.insert_float(key, value as float)
+    }
+    fn insert_uint(key: str, value: uint) -> json_dict_builder {
+        self.insert_float(key, value as float)
+    }
     fn insert_float(key: str, value: float) -> json_dict_builder {
         self.insert(key, json::num(value));
         self
@@ -796,6 +880,16 @@ mod tests {
         io::println(#fmt("%?\n", client.transport.head("/")));
         io::println(#fmt("%?\n", client.transport.get("/")));
 
+        io::println(#fmt("%?\n", client.prepare_create_index("test")
+          .set_source(json_dict_builder()
+              .insert_dict("settings") { |bld|
+                  bld
+                    .insert_uint("index.number_of_shards", 1u)
+                    .insert_uint("index.number_of_replicas", 0u);
+              }
+          )
+          .execute()));
+
         io::println(#fmt("%?\n", client.get("test", "test", "1")));
 
         io::println(#fmt("%?\n", client.prepare_index("test", "test")
@@ -840,6 +934,10 @@ mod tests {
                   bld.insert_str("bar", "lala");
               }
           )
+          .execute()));
+
+        io::println(#fmt("%?\n", client.prepare_delete_index()
+          .set_indices(["test"])
           .execute()));
     }
 }
