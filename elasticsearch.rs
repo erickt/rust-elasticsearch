@@ -94,7 +94,7 @@ enum replication { REPLICATION_DEFAULT, SYNC, ASYNC }
 enum op_type { CREATE, INDEX }
 enum version_type { INTERNAL, EXTERNAL }
 
-type create_index_builder = {
+type create_index_builder = @{
     client: client,
     index: str,
 
@@ -104,7 +104,7 @@ type create_index_builder = {
 };
 
 fn create_index_builder(client: client, index: str) -> create_index_builder {
-    {
+    @{
         client: client,
         index: index,
 
@@ -143,14 +143,14 @@ impl create_index_builder for create_index_builder {
     }
 }
 
-type delete_index_builder = {
+type delete_index_builder = @{
     client: client,
     mut indices: [str],
     mut timeout: option<str>,
 };
 
 fn delete_index_builder(client: client) -> delete_index_builder {
-    {
+    @{
         client: client,
         mut indices: [],
         mut timeout: none,
@@ -182,7 +182,7 @@ impl delete_index_builder for delete_index_builder {
     }
 }
 
-type index_builder = {
+type index_builder = @{
     client: client,
     index: str,
     typ: str,
@@ -205,7 +205,7 @@ type index_builder = {
 };
 
 fn index_builder(client: client, index: str, typ: str) -> index_builder {
-    {
+    @{
         client: client,
         index: index,
         typ: typ,
@@ -352,10 +352,10 @@ enum search_type {
     COUNT,
 }
 
-type search_builder = {
+type search_builder = @{
     client: client,
     mut indices: [str],
-    mut types: [str],
+    mut types2: [str],
 
     mut preference: option<str>,
     mut routing: option<str>,
@@ -367,7 +367,7 @@ type search_builder = {
 };
 
 fn search_builder(client: client) -> search_builder {
-    {
+    @{
         client: client,
         mut indices: [],
         mut types: [],
@@ -462,7 +462,7 @@ impl search_builder for search_builder {
     }
 }
 
-type delete_builder = {
+type delete_builder = @{
     client: client,
     index: str,
     typ: str,
@@ -478,7 +478,7 @@ type delete_builder = {
 };
 
 fn delete_builder(client: client, index: str, typ: str, id: str) -> delete_builder {
-    {
+    @{
         client: client,
         index: index,
         typ: typ,
@@ -566,7 +566,7 @@ impl delete_builder for delete_builder {
     }
 }
 
-type delete_by_query_builder = {
+type delete_by_query_builder = @{
     client: client,
     mut indices: [str],
     mut types: [str],
@@ -581,7 +581,7 @@ type delete_by_query_builder = {
 };
 
 fn delete_by_query_builder(client: client) -> delete_by_query_builder {
-    {
+    @{
         client: client,
         mut indices: [],
         mut types: [],
@@ -667,10 +667,10 @@ impl delete_by_query_builder for delete_by_query_builder {
     }
 }
 
-type json_dict_builder = hashmap<str, json>;
+type json_dict_builder = @hashmap<str, json>;
 
 fn json_dict_builder() -> json_dict_builder {
-    map::str_hash()
+    @map::str_hash()
 }
 
 impl json_dict_builder for json_dict_builder {
@@ -681,32 +681,32 @@ impl json_dict_builder for json_dict_builder {
         self.insert_float(key, value as float)
     }
     fn insert_float(key: str, value: float) -> json_dict_builder {
-        self.insert(key, json::num(value));
+        (*self).insert(key, json::num(value));
         self
     }
     fn insert_str(key: str, value: str) -> json_dict_builder {
-        self.insert(key, json::string(value));
+        (*self).insert(key, json::string(value));
         self
     }
     fn insert_bool(key: str, value: bool) -> json_dict_builder {
-        self.insert(key, json::boolean(value));
+        (*self).insert(key, json::boolean(value));
         self
     }
     fn insert_null(key: str) -> json_dict_builder {
-        self.insert(key, json::null);
+        (*self).insert(key, json::null);
         self
     }
     fn insert_dict(key: str, f: fn(json_dict_builder))
       -> json_dict_builder {
         let builder = json_dict_builder();
         f(builder);
-        self.insert(key, json::dict(builder));
+        (*self).insert(key, json::dict(*builder));
         self
     }
     fn insert_list(key: str, f: fn(json_list_builder)) -> json_dict_builder {
         let builder = json_list_builder();
         f(builder);
-        self.insert(key, json::list(*builder));
+        (*self).insert(key, json::list(*builder));
         self
     }
     fn insert_strs(key: str, values: [str]) -> json_dict_builder {
@@ -742,7 +742,7 @@ impl json_list_builder for json_list_builder {
     fn push_dict(f: fn(json_dict_builder)) -> json_list_builder {
         let builder = json_dict_builder();
         f(builder);
-        vec::push(*self, json::dict(builder));
+        vec::push(*self, json::dict(*builder));
         self
     }
     fn push_list(f: fn(json_list_builder)) -> json_list_builder {
