@@ -355,7 +355,7 @@ enum search_type {
 type search_builder = @{
     client: client,
     mut indices: [str],
-    mut types2: [str],
+    mut types: [str],
 
     mut preference: option<str>,
     mut routing: option<str>,
