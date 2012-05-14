@@ -881,7 +881,7 @@ mod tests {
         io::println(#fmt("%?\n", client.transport.get("/")));
 
         io::println(#fmt("%?\n", client.prepare_create_index("test")
-          .set_source(json_dict_builder()
+          .set_source(*json_dict_builder()
               .insert_dict("settings") { |bld|
                   bld
                     .insert_uint("index.number_of_shards", 1u)
@@ -895,7 +895,7 @@ mod tests {
         io::println(#fmt("%?\n", client.prepare_index("test", "test")
           .set_id("1")
           .set_version(2u)
-          .set_source(json_dict_builder()
+          .set_source(*json_dict_builder()
               .insert_float("foo", 5.0)
               .insert_str("bar", "wee")
               .insert_dict("baz") { |bld|
@@ -912,7 +912,7 @@ mod tests {
 
         io::println(#fmt("%?\n", client.prepare_search()
           .set_indices(["test"])
-          .set_source(json_dict_builder()
+          .set_source(*json_dict_builder()
               .insert_strs("fields", ["foo", "bar"])
           )
           .execute()));
@@ -921,7 +921,7 @@ mod tests {
 
         io::println(#fmt("%?\n", client.prepare_index("test", "test")
           .set_id("2")
-          .set_source(json_dict_builder()
+          .set_source(*json_dict_builder()
               .insert_str("bar", "lala")
           )
           .set_refresh(true)
@@ -929,7 +929,7 @@ mod tests {
 
         io::println(#fmt("%?\n", client.prepare_delete_by_query()
           .set_indices(["test"])
-          .set_source(json_dict_builder()
+          .set_source(*json_dict_builder()
               .insert_dict("term") { |bld|
                   bld.insert_str("bar", "lala");
               }
