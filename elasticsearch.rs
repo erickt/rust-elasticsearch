@@ -54,7 +54,11 @@ impl client for client {
 
     #[doc = "Get a specific document"]
     fn get(index: str, typ: str, id: str) -> response {
-        let path = index + "/" + typ + "/" + id;
+        let path = str::connect([
+            encode_uri_component(index),
+            encode_uri_component(typ),
+            encode_uri_component(id)
+        ], "/");
         self.transport.get(path)
     }
 
@@ -124,7 +128,7 @@ impl create_index_builder for create_index_builder {
         self
     }
     fn execute() -> response {
-        let mut path = self.index;
+        let mut path = encode_uri_component(self.index);
 
         let mut params = [];
 
@@ -167,7 +171,8 @@ impl delete_index_builder for delete_index_builder {
         self
     }
     fn execute() -> response {
-        let mut path = str::connect(self.indices, ",");
+        let indices = self.indices.map { |i| encode_uri_component(i) };
+        let mut path = str::connect(indices, ",");
 
         // Build the query parameters.
         let mut params = [];
@@ -286,8 +291,11 @@ impl index_builder for index_builder {
         self
     }
     fn execute() -> response {
-        let mut path = [self.index, self.typ];
-        self.id.iter { |id| vec::push(path, id); }
+        let mut path = [
+            encode_uri_component(self.index),
+            encode_uri_component(self.typ)
+        ];
+        self.id.iter { |id| vec::push(path, encode_uri_component(id)); }
 
         let mut path = str::connect(path, "/");
         let mut params = [];
@@ -416,10 +424,13 @@ impl search_builder for search_builder {
         self
     }
     fn execute() -> response {
+        let indices = self.indices.map { |i| encode_uri_component(i) };
+        let types   = self.types.map   { |t| encode_uri_component(t) };
+
         let mut path = [];
 
-        vec::push(path, str::connect(self.indices, ","));
-        vec::push(path, str::connect(self.types, ","));
+        vec::push(path, str::connect(indices, ","));
+        vec::push(path, str::connect(types, ","));
         vec::push(path, "_search");
 
         let mut path = str::connect(path, "/");
@@ -528,7 +539,11 @@ impl delete_builder for delete_builder {
         self
     }
     fn execute() -> response {
-        let mut path = self.index + "/" + self.typ + "/" + self.id;
+        let mut path = str::connect([
+            encode_uri_component(self.index),
+            encode_uri_component(self.typ),
+            encode_uri_component(self.id)
+        ], "/");
 
         // Build the query parameters.
         let mut params = [];

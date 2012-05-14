@@ -5,3 +5,6 @@
 
 use std;
 use zmq;
+use uri;
+
+import uri::encode_uri_component;
