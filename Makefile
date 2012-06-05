@@ -5,8 +5,8 @@ test:
 	rust --test elasticsearch.rc
 
 deps:
-	cargo install -g zmq
-	cargo install -g uri
+	cargo install zmq
+	cargo install uri
 
 clean:
 	rm -rf elasticsearch *.so *.dylib *.dSYM
