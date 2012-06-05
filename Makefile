@@ -2,7 +2,7 @@ all:
 	rustc elasticsearch.rc
 
 test:
-	rust --test elasticsearch.rc
+	rustc --test elasticsearch.rc
 
 deps:
 	cargo install zmq
