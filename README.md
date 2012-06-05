@@ -12,7 +12,7 @@ Install for the users of rust-elasticsearch:
 
 Install for developers:
 
-    % git clone https://https://github.com/erickt/rust-elasticsearch
+    % git clone https://github.com/erickt/rust-elasticsearch
     % cd rust-elasticsearch
     % make deps
     % make
