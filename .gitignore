@@ -2,3 +2,4 @@
 elasticsearch
 *.dylib
 *.dSYM
+.cargo
