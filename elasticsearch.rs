@@ -794,7 +794,11 @@ impl of transport for zmq_transport {
         #debug("request: %s", request);
 
         str::as_bytes(request) { |bytes|
-            alt self.socket.send_between(bytes, 0u, str::len(request), 0) {
+            // The Elasticsearch ZMQ transpot expects there to be no trailing
+            // \0.
+            let bytes = vec::view(bytes, 0u, bytes.len() - 1u);
+
+            alt self.socket.send(bytes, 0) {
               ok(()) {}
               err(e) { fail e.to_str(); }
             }
