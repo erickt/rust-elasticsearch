@@ -1,11 +1,3 @@
-import result::{ok, err};
-import std::json;
-import std::map;
-import std::map::hashmap;
-import zmq::{context, socket, error};
-
-import json = std::json::json;
-
 export transport, zmq_transport, connect_with_zmq;
 export client;
 export consistency;
@@ -43,7 +35,7 @@ fn client(transport: transport) -> client {
 
 impl client for client {
     #[doc = "Create an index"]
-    fn prepare_create_index(index: str) -> create_index_builder {
+    fn prepare_create_index(+index: str) -> create_index_builder {
         create_index_builder(self, index)
     }
 
@@ -53,7 +45,7 @@ impl client for client {
     }
 
     #[doc = "Get a specific document"]
-    fn get(index: str, typ: str, id: str) -> response {
+    fn get(index: str, +typ: str, +id: str) -> response {
         let path = str::connect([
             encode_uri_component(index),
             encode_uri_component(typ),
@@ -63,7 +55,7 @@ impl client for client {
     }
 
     #[doc = "Create an index builder that will create documents"]
-    fn prepare_index(index: str, typ: str) -> index_builder {
+    fn prepare_index(+index: str, +typ: str) -> index_builder {
         index_builder(self, index, typ)
     }
 
@@ -73,12 +65,12 @@ impl client for client {
     }
 
     #[doc = "Delete a document"]
-    fn delete(index: str, typ: str, id: str) -> response {
+    fn delete(+index: str, +typ: str, +id: str) -> response {
         self.prepare_delete(index, typ, id).execute()
     }
 
     #[doc = "Delete a document"]
-    fn prepare_delete(index: str, typ: str, id: str) -> delete_builder {
+    fn prepare_delete(+index: str, +typ: str, +id: str) -> delete_builder {
         delete_builder(self, index, typ, id)
     }
 
@@ -104,10 +96,10 @@ type create_index_builder = @{
 
     mut timeout: option<str>,
 
-    mut source: option<hashmap<str, json>>
+    mut source: option<@hashmap<str, json>>
 };
 
-fn create_index_builder(client: client, index: str) -> create_index_builder {
+fn create_index_builder(client: client, +index: str) -> create_index_builder {
     @{
         client: client,
         index: index,
@@ -119,12 +111,12 @@ fn create_index_builder(client: client, index: str) -> create_index_builder {
 }
 
 impl create_index_builder for create_index_builder {
-    fn set_timeout(timeout: str) -> create_index_builder {
+    fn set_timeout(+timeout: str) -> create_index_builder {
         self.timeout = some(timeout);
         self
     }
     fn set_source(source: hashmap<str, json>) -> create_index_builder {
-        self.source = some(source);
+        self.source = some(@source);
         self
     }
     fn execute() -> response {
@@ -132,18 +124,20 @@ impl create_index_builder for create_index_builder {
 
         let mut params = [];
 
-        self.timeout.iter { |s| vec::push(params, "timeout=" + s); }
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.timeout {
+          none { }
+          some(s) { vec::push(params, "timeout=" + s); }
+        }
 
         if vec::is_not_empty(params) {
             path += "?" + str::connect(params, "&");
         }
 
-        let source = alt self.source {
-          none { map::str_hash() }
-          some(source) { source }
-        };
-
-        self.client.transport.put(path, source)
+        alt copy self.source {
+          none { self.client.transport.put(path, map::str_hash()) }
+          some(source) { self.client.transport.put(path, *source) }
+        }
     }
 }
 
@@ -162,22 +156,26 @@ fn delete_index_builder(client: client) -> delete_index_builder {
 }
 
 impl delete_index_builder for delete_index_builder {
-    fn set_indices(indices: [str]) -> delete_index_builder {
+    fn set_indices(+indices: [str]) -> delete_index_builder {
         self.indices = indices;
         self
     }
-    fn set_timeout(timeout: str) -> delete_index_builder {
+    fn set_timeout(+timeout: str) -> delete_index_builder {
         self.timeout = some(timeout);
         self
     }
     fn execute() -> response {
-        let indices = self.indices.map { |i| encode_uri_component(i) };
+        let indices = (copy self.indices).map { |i| encode_uri_component(i) };
         let mut path = str::connect(indices, ",");
 
         // Build the query parameters.
         let mut params = [];
 
-        self.timeout.iter { |timeout| vec::push(params, "timeout=" + timeout); }
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.timeout {
+          none { }
+          some(timeout) { vec::push(params, "timeout=" + timeout); }
+        }
 
         if vec::is_not_empty(params) {
             path += "?" + str::connect(params, "&");
@@ -209,7 +207,7 @@ type index_builder = @{
     mut source: option<hashmap<str, json>>,
 };
 
-fn index_builder(client: client, index: str, typ: str) -> index_builder {
+fn index_builder(client: client, +index: str, +typ: str) -> index_builder {
     @{
         client: client,
         index: index,
@@ -234,7 +232,7 @@ fn index_builder(client: client, index: str, typ: str) -> index_builder {
 }
 
 impl index_builder for index_builder {
-    fn set_id(id: str) -> index_builder {
+    fn set_id(+id: str) -> index_builder {
         self.id = some(id);
         self
     }
@@ -246,11 +244,11 @@ impl index_builder for index_builder {
         self.op_type = op_type;
         self
     }
-    fn set_parent(parent: str) -> index_builder {
+    fn set_parent(+parent: str) -> index_builder {
         self.parent = some(parent);
         self
     }
-    fn set_percolate(percolate: str) -> index_builder {
+    fn set_percolate(+percolate: str) -> index_builder {
         self.percolate = some(percolate);
         self
     }
@@ -262,19 +260,19 @@ impl index_builder for index_builder {
         self.replication = replication;
         self
     }
-    fn set_routing(routing: str) -> index_builder {
+    fn set_routing(+routing: str) -> index_builder {
         self.routing = some(routing);
         self
     }
-    fn set_timeout(timeout: str) -> index_builder {
+    fn set_timeout(+timeout: str) -> index_builder {
         self.timeout = some(timeout);
         self
     }
-    fn set_timestamp(timestamp: str) -> index_builder {
+    fn set_timestamp(+timestamp: str) -> index_builder {
         self.timestamp = some(timestamp);
         self
     }
-    fn set_ttl(ttl: str) -> index_builder {
+    fn set_ttl(+ttl: str) -> index_builder {
         self.ttl = some(ttl);
         self
     }
@@ -295,7 +293,12 @@ impl index_builder for index_builder {
             encode_uri_component(self.index),
             encode_uri_component(self.typ)
         ];
-        self.id.iter { |id| vec::push(path, encode_uri_component(id)); }
+
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.id {
+          none { }
+          some(id) { vec::push(path, encode_uri_component(id)); }
+        }
 
         let mut path = str::connect(path, "/");
         let mut params = [];
@@ -312,22 +315,53 @@ impl index_builder for index_builder {
           INDEX {}
         }
 
-        self.parent.iter    { |s| vec::push(params, "parent=" + s); }
-        self.percolate.iter { |s| vec::push(params, "percolate=" + s); }
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.parent {
+          none { }
+          some(s) { vec::push(params, "parent=" + s); }
+        }
+
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.percolate {
+          none { }
+          some(s) { vec::push(params, "percolate=" + s); }
+        }
 
         if self.refresh { vec::push(params, "refresh=true"); }
 
-        alt self.replication {
+        alt copy self.replication {
           REPLICATION_DEFAULT {}
           SYNC { vec::push(params, "replication=sync"); }
           ASYNC { vec::push(params, "replication=async"); }
         }
 
-        self.routing.iter   { |s| vec::push(params, "routing=" + s); }
-        self.timeout.iter   { |s| vec::push(params, "timeout=" + s); }
-        self.timestamp.iter { |s| vec::push(params, "timestamp=" + s); }
-        self.ttl.iter       { |s| vec::push(params, "ttl=" + s); }
-        self.version.iter   { |i| vec::push(params, #fmt("version=%u", i)); }
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.routing {
+          none { }
+          some(s) { vec::push(params, "routing=" + s); }
+        }
+
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.timeout {
+          none { }
+          some(s) { vec::push(params, "timeout=" + s); }
+        }
+
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.timestamp {
+          none { }
+          some(s) { vec::push(params, "timestamp=" + s); }
+        }
+
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.ttl {
+          none { }
+          some(s) { vec::push(params, "ttl=" + s); }
+        }
+
+        (copy self.version).iter { |i|
+            vec::push(params, #fmt("version=%u", i));
+        }
 
         alt self.version_type {
           INTERNAL {}
@@ -391,23 +425,23 @@ fn search_builder(client: client) -> search_builder {
 }
 
 impl search_builder for search_builder {
-    fn set_indices(indices: [str]) -> search_builder {
+    fn set_indices(+indices: [str]) -> search_builder {
         self.indices = indices;
         self
     }
-    fn set_types(types: [str]) -> search_builder {
+    fn set_types(+types: [str]) -> search_builder {
         self.types = types;
         self
     }
-    fn set_preference(preference: str) -> search_builder {
+    fn set_preference(+preference: str) -> search_builder {
         self.preference = some(preference);
         self
     }
-    fn set_routing(routing: str) -> search_builder {
+    fn set_routing(+routing: str) -> search_builder {
         self.routing = some(routing);
         self
     }
-    fn set_scroll(scroll: str) -> search_builder {
+    fn set_scroll(+scroll: str) -> search_builder {
         self.scroll = some(scroll);
         self
     }
@@ -415,7 +449,7 @@ impl search_builder for search_builder {
         self.search_type = search_type;
         self
     }
-    fn set_timeout(timeout: str) -> search_builder {
+    fn set_timeout(+timeout: str) -> search_builder {
         self.timeout = some(timeout);
         self
     }
@@ -424,8 +458,8 @@ impl search_builder for search_builder {
         self
     }
     fn execute() -> response {
-        let indices = self.indices.map { |i| encode_uri_component(i) };
-        let types   = self.types.map   { |t| encode_uri_component(t) };
+        let indices = (copy self.indices).map { |i| encode_uri_component(i) };
+        let types   = (copy self.types).map   { |t| encode_uri_component(t) };
 
         let mut path = [];
 
@@ -438,9 +472,23 @@ impl search_builder for search_builder {
         // Build the query parameters.
         let mut params = [];
 
-        self.preference.iter { |s| vec::push(params, "preference=" + s); }
-        self.routing.iter    { |s| vec::push(params, "routing=" + s); }
-        self.scroll.iter     { |s| vec::push(params, "scroll=" + s) }
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.preference {
+          none { }
+          some(s) { vec::push(params, "preference=" + s); }
+        }
+
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.routing {
+          none { }
+          some(s) { vec::push(params, "routing=" + s); }
+        }
+
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.scroll {
+          none { }
+          some(s) { vec::push(params, "scroll=" + s) }
+        }
 
         alt self.search_type {
           SEARCH_DEFAULT {}
@@ -458,7 +506,11 @@ impl search_builder for search_builder {
           COUNT { vec::push(params, "search_type=count"); }
         }
 
-        self.timeout.iter { |s| vec::push(params, "timeout=" + s); }
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.timeout {
+          none { }
+          some(s) { vec::push(params, "timeout=" + s); }
+        }
 
         if vec::is_not_empty(params) {
             path += "?" + str::connect(params, "&");
@@ -488,7 +540,12 @@ type delete_builder = @{
     mut version_type: version_type
 };
 
-fn delete_builder(client: client, index: str, typ: str, id: str) -> delete_builder {
+fn delete_builder(
+    client: client,
+    +index: str,
+    +typ: str,
+    +id: str
+) -> delete_builder {
     @{
         client: client,
         index: index,
@@ -509,7 +566,7 @@ impl delete_builder for delete_builder {
         self.consistency = consistency;
         self
     }
-    fn set_parent(parent: str) -> delete_builder {
+    fn set_parent(+parent: str) -> delete_builder {
         // We use the parent for routing.
         self.routing = some(parent);
         self
@@ -522,11 +579,11 @@ impl delete_builder for delete_builder {
         self.replication = replication;
         self
     }
-    fn set_routing(routing: str) -> delete_builder {
+    fn set_routing(+routing: str) -> delete_builder {
         self.routing = some(routing);
         self
     }
-    fn set_timeout(timeout: str) -> delete_builder {
+    fn set_timeout(+timeout: str) -> delete_builder {
         self.timeout = some(timeout);
         self
     }
@@ -563,10 +620,21 @@ impl delete_builder for delete_builder {
           ASYNC { vec::push(params, "replication=async"); }
         }
 
-        self.routing.iter { |s| vec::push(params, "routing=" + s); }
-        self.timeout.iter { |s| vec::push(params, "timeout=" + s); }
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.routing {
+          none { }
+          some(s) { vec::push(params, "routing=" + s); }
+        }
 
-        self.version.iter   { |i| vec::push(params, #fmt("version=%u", i)); }
+        // FIXME: https://github.com/mozilla/rust/issues/2549
+        alt copy self.timeout {
+          none { }
+          some(s) { vec::push(params, "timeout=" + s); }
+        }
+
+        (copy self.version).iter { |i|
+            vec::push(params, #fmt("version=%u", i));
+        }
 
         alt self.version_type {
           INTERNAL {}
@@ -612,11 +680,11 @@ fn delete_by_query_builder(client: client) -> delete_by_query_builder {
 }
 
 impl delete_by_query_builder for delete_by_query_builder {
-    fn set_indices(indices: [str]) -> delete_by_query_builder {
+    fn set_indices(+indices: [str]) -> delete_by_query_builder {
         self.indices = indices;
         self
     }
-    fn set_types(types: [str]) -> delete_by_query_builder {
+    fn set_types(+types: [str]) -> delete_by_query_builder {
         self.types = types;
         self
     }
@@ -632,11 +700,11 @@ impl delete_by_query_builder for delete_by_query_builder {
         self.replication = replication;
         self
     }
-    fn set_routing(routing: str) -> delete_by_query_builder {
+    fn set_routing(+routing: str) -> delete_by_query_builder {
         self.routing = some(routing);
         self
     }
-    fn set_timeout(timeout: str) -> delete_by_query_builder {
+    fn set_timeout(+timeout: str) -> delete_by_query_builder {
         self.timeout = some(timeout);
         self
     }
@@ -671,100 +739,74 @@ impl delete_by_query_builder for delete_by_query_builder {
           ASYNC { vec::push(params, "replication=async"); }
         }
 
-        self.routing.iter { |routing| vec::push(params, "routing=" + routing); }
-        self.timeout.iter { |timeout| vec::push(params, "timeout=" + timeout); }
+        alt copy self.routing {
+          none {}
+          some(routing) { vec::push(params, "routing=" + routing); }
+        }
+
+        alt copy self.timeout {
+          none {}
+          some(timeout) { vec::push(params, "timeout=" + timeout); }
+        }
 
         if vec::is_not_empty(params) {
             path += "?" + str::connect(params, "&");
         }
 
-        self.client.transport.delete(path, self.source)
+        self.client.transport.delete(path, copy self.source)
     }
 }
+
+type json_list_builder = @dvec<json>;
+
+fn json_list_builder() -> json_list_builder { 
+    @dvec()
+}
+
+impl json_list_builder for json_list_builder {
+    fn push<T: to_json>(value: T) -> json_list_builder {
+        (*self).push(value.to_json());
+        self
+    }
+
+    fn push_list(f: fn(json_list_builder)) -> json_list_builder {
+        let builder = json_list_builder();
+        f(builder);
+        let builder <- *builder;
+        self.push(vec::from_mut(dvec::unwrap(builder)))
+    }
+
+    fn push_dict(f: fn(json_dict_builder)) -> json_list_builder {
+        let builder = json_dict_builder();
+        f(builder);
+        self.push(*builder)
+    }
+}
+
 
 type json_dict_builder = @hashmap<str, json>;
 
 fn json_dict_builder() -> json_dict_builder {
-    @map::str_hash()
+    @str_hash()
 }
 
 impl json_dict_builder for json_dict_builder {
-    fn insert_int(key: str, value: int) -> json_dict_builder {
-        self.insert_float(key, value as float)
-    }
-    fn insert_uint(key: str, value: uint) -> json_dict_builder {
-        self.insert_float(key, value as float)
-    }
-    fn insert_float(key: str, value: float) -> json_dict_builder {
-        (*self).insert(key, json::num(value));
+    fn insert<T: to_json>(+key: str, value: T) -> json_dict_builder {
+        (*self).insert(key, value.to_json());
         self
     }
-    fn insert_str(key: str, value: str) -> json_dict_builder {
-        (*self).insert(key, json::string(value));
-        self
-    }
-    fn insert_bool(key: str, value: bool) -> json_dict_builder {
-        (*self).insert(key, json::boolean(value));
-        self
-    }
-    fn insert_null(key: str) -> json_dict_builder {
-        (*self).insert(key, json::null);
-        self
-    }
-    fn insert_dict(key: str, f: fn(json_dict_builder))
-      -> json_dict_builder {
-        let builder = json_dict_builder();
-        f(builder);
-        (*self).insert(key, json::dict(*builder));
-        self
-    }
-    fn insert_list(key: str, f: fn(json_list_builder)) -> json_dict_builder {
+
+    fn insert_list(+key: str, f: fn(json_list_builder)) -> json_dict_builder {
         let builder = json_list_builder();
         f(builder);
-        (*self).insert(key, json::list(*builder));
-        self
+        let builder <- *builder;
+        self.insert(key, vec::from_mut(dvec::unwrap(builder)))
     }
-    fn insert_strs(key: str, values: [str]) -> json_dict_builder {
-        self.insert_list(key) { |builder|
-            vec::iter(values) { |value| builder.push_str(value); }
-        }
-    }
-}
 
-type json_list_builder = @mut [json];
-
-fn json_list_builder() -> json_list_builder {
-    @mut []
-}
-
-impl json_list_builder for json_list_builder {
-    fn push_float(value: float) -> json_list_builder {
-        vec::push(*self, json::num(value));
-        self
-    }
-    fn push_str(value: str) -> json_list_builder {
-        vec::push(*self, json::string(value));
-        self
-    }
-    fn push_bool(value: bool) -> json_list_builder {
-        vec::push(*self, json::boolean(value));
-        self
-    }
-    fn push_null() -> json_list_builder {
-        vec::push(*self, json::null);
-        self
-    }
-    fn push_dict(f: fn(json_dict_builder)) -> json_list_builder {
+    fn insert_dict(+key: str, f: fn(json_dict_builder)) -> json_dict_builder {
         let builder = json_dict_builder();
         f(builder);
-        vec::push(*self, json::dict(*builder));
-        self
-    }
-    fn push_list(f: fn(json_list_builder)) -> json_list_builder {
-        let builder = json_list_builder();
-        f(builder);
-        vec::push(*self, json::list(*builder));
-        self
+        self.insert(key, *builder)
     }
 }
 
@@ -776,16 +818,16 @@ impl of transport for zmq_transport {
     fn head(path: str) -> response { self.send("HEAD|" + path) }
     fn get(path: str) -> response { self.send("GET|" + path) }
     fn put(path: str, source: hashmap<str, json>) -> response {
-        self.send("PUT|" + path + "|" + json::to_str(json::dict(source)))
+        self.send("PUT|" + path + "|" + json::dict(source).to_str())
     }
     fn post(path: str, source: hashmap<str, json>) -> response {
-        self.send("POST|" + path + "|" + json::to_str(json::dict(source)))
+        self.send("POST|" + path + "|" + json::dict(source).to_str())
     }
     fn delete(path: str, source: option<hashmap<str, json>>) -> response {
         alt source {
           none { self.send("DELETE|" + path) }
           some(source) {
-            self.send("DELETE|" + path + "|" + json::to_str(json::dict(source)))
+            self.send("DELETE|" + path + "|" + json::dict(source).to_str())
           }
         }
     }
@@ -880,83 +922,8 @@ mod response {
         io::with_bytes_reader_between(msg, start, end) { |rdr|
             alt json::from_reader(rdr) {
               ok(json) { json }
-              err({line, col, msg}) { fail #fmt("%u:%u: %s", line, col, msg); }
+              err(e) { fail e.to_str(); }
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test() {
-        let ctx = alt zmq::init(1) {
-          ok(ctx) { ctx }
-          err(e) { fail e.to_str(); }
-        };
-
-        let client = connect_with_zmq(ctx, "tcp://localhost:9700");
-        io::println(#fmt("%?\n", client.transport.head("/")));
-        io::println(#fmt("%?\n", client.transport.get("/")));
-
-        io::println(#fmt("%?\n", client.prepare_create_index("test")
-          .set_source(*json_dict_builder()
-              .insert_dict("settings") { |bld|
-                  bld
-                    .insert_uint("index.number_of_shards", 1u)
-                    .insert_uint("index.number_of_replicas", 0u);
-              }
-          )
-          .execute()));
-
-        io::println(#fmt("%?\n", client.get("test", "test", "1")));
-
-        io::println(#fmt("%?\n", client.prepare_index("test", "test")
-          .set_id("1")
-          .set_version(2u)
-          .set_source(*json_dict_builder()
-              .insert_float("foo", 5.0)
-              .insert_str("bar", "wee")
-              .insert_dict("baz") { |bld|
-                  bld.insert_float("a", 2.0);
-              }
-              .insert_list("boo") { |bld|
-                  bld.push_float(1.0).push_str("zzz");
-              }
-          )
-          .set_refresh(true)
-          .execute()));
-
-        io::println(#fmt("%?\n", client.get("test", "test", "1")));
-
-        io::println(#fmt("%?\n", client.prepare_search()
-          .set_indices(["test"])
-          .set_source(*json_dict_builder()
-              .insert_strs("fields", ["foo", "bar"])
-          )
-          .execute()));
-
-        io::println(#fmt("%?\n", client.delete("test", "test", "1")));
-
-        io::println(#fmt("%?\n", client.prepare_index("test", "test")
-          .set_id("2")
-          .set_source(*json_dict_builder()
-              .insert_str("bar", "lala")
-          )
-          .set_refresh(true)
-          .execute()));
-
-        io::println(#fmt("%?\n", client.prepare_delete_by_query()
-          .set_indices(["test"])
-          .set_source(*json_dict_builder()
-              .insert_dict("term") { |bld|
-                  bld.insert_str("bar", "lala");
-              }
-          )
-          .execute()));
-
-        io::println(#fmt("%?\n", client.prepare_delete_index()
-          .set_indices(["test"])
-          .execute()));
     }
 }

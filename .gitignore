@@ -3,3 +3,4 @@ elasticsearch
 *.dylib
 *.dSYM
 .cargo
+example
