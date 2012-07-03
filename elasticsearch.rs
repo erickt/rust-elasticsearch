@@ -46,7 +46,7 @@ impl client for client {
 
     #[doc = "Get a specific document"]
     fn get(index: str, +typ: str, +id: str) -> response {
-        let path = str::connect([
+        let path = str::connect(~[
             encode_uri_component(index),
             encode_uri_component(typ),
             encode_uri_component(id)
@@ -122,7 +122,7 @@ impl create_index_builder for create_index_builder {
     fn execute() -> response {
         let mut path = encode_uri_component(self.index);
 
-        let mut params = [];
+        let mut params = ~[];
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         alt copy self.timeout {
@@ -143,20 +143,20 @@ impl create_index_builder for create_index_builder {
 
 type delete_index_builder = @{
     client: client,
-    mut indices: [str],
+    mut indices: ~[str],
     mut timeout: option<str>,
 };
 
 fn delete_index_builder(client: client) -> delete_index_builder {
     @{
         client: client,
-        mut indices: [],
+        mut indices: ~[],
         mut timeout: none,
     }
 }
 
 impl delete_index_builder for delete_index_builder {
-    fn set_indices(+indices: [str]) -> delete_index_builder {
+    fn set_indices(+indices: ~[str]) -> delete_index_builder {
         self.indices = indices;
         self
     }
@@ -165,11 +165,11 @@ impl delete_index_builder for delete_index_builder {
         self
     }
     fn execute() -> response {
-        let indices = (copy self.indices).map { |i| encode_uri_component(i) };
+        let indices = (copy self.indices).map(|i| encode_uri_component(i));
         let mut path = str::connect(indices, ",");
 
         // Build the query parameters.
-        let mut params = [];
+        let mut params = ~[];
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         alt copy self.timeout {
@@ -289,7 +289,7 @@ impl index_builder for index_builder {
         self
     }
     fn execute() -> response {
-        let mut path = [
+        let mut path = ~[
             encode_uri_component(self.index),
             encode_uri_component(self.typ)
         ];
@@ -301,7 +301,7 @@ impl index_builder for index_builder {
         }
 
         let mut path = str::connect(path, "/");
-        let mut params = [];
+        let mut params = ~[];
 
         alt self.consistency {
           CONSISTENCY_DEFAULT {}
@@ -359,9 +359,7 @@ impl index_builder for index_builder {
           some(s) { vec::push(params, "ttl=" + s); }
         }
 
-        (copy self.version).iter { |i|
-            vec::push(params, #fmt("version=%u", i));
-        }
+        (copy self.version).iter(|i| vec::push(params, #fmt("version=%u", i)));
 
         alt self.version_type {
           INTERNAL {}
@@ -396,8 +394,8 @@ enum search_type {
 
 type search_builder = @{
     client: client,
-    mut indices: [str],
-    mut types: [str],
+    mut indices: ~[str],
+    mut types: ~[str],
 
     mut preference: option<str>,
     mut routing: option<str>,
@@ -411,8 +409,8 @@ type search_builder = @{
 fn search_builder(client: client) -> search_builder {
     @{
         client: client,
-        mut indices: [],
-        mut types: [],
+        mut indices: ~[],
+        mut types: ~[],
 
         mut preference: none,
         mut routing: none,
@@ -425,11 +423,11 @@ fn search_builder(client: client) -> search_builder {
 }
 
 impl search_builder for search_builder {
-    fn set_indices(+indices: [str]) -> search_builder {
+    fn set_indices(+indices: ~[str]) -> search_builder {
         self.indices = indices;
         self
     }
-    fn set_types(+types: [str]) -> search_builder {
+    fn set_types(+types: ~[str]) -> search_builder {
         self.types = types;
         self
     }
@@ -458,10 +456,10 @@ impl search_builder for search_builder {
         self
     }
     fn execute() -> response {
-        let indices = (copy self.indices).map { |i| encode_uri_component(i) };
-        let types   = (copy self.types).map   { |t| encode_uri_component(t) };
+        let indices = (copy self.indices).map(|i| encode_uri_component(i));
+        let types   = (copy self.types).map(|t| encode_uri_component(t));
 
-        let mut path = [];
+        let mut path = ~[];
 
         vec::push(path, str::connect(indices, ","));
         vec::push(path, str::connect(types, ","));
@@ -470,7 +468,7 @@ impl search_builder for search_builder {
         let mut path = str::connect(path, "/");
 
         // Build the query parameters.
-        let mut params = [];
+        let mut params = ~[];
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         alt copy self.preference {
@@ -596,14 +594,14 @@ impl delete_builder for delete_builder {
         self
     }
     fn execute() -> response {
-        let mut path = str::connect([
+        let mut path = str::connect(~[
             encode_uri_component(self.index),
             encode_uri_component(self.typ),
             encode_uri_component(self.id)
         ], "/");
 
         // Build the query parameters.
-        let mut params = [];
+        let mut params = ~[];
 
         alt self.consistency {
           CONSISTENCY_DEFAULT {}
@@ -632,9 +630,7 @@ impl delete_builder for delete_builder {
           some(s) { vec::push(params, "timeout=" + s); }
         }
 
-        (copy self.version).iter { |i|
-            vec::push(params, #fmt("version=%u", i));
-        }
+        (copy self.version).iter(|i| vec::push(params, #fmt("version=%u", i)));
 
         alt self.version_type {
           INTERNAL {}
@@ -651,8 +647,8 @@ impl delete_builder for delete_builder {
 
 type delete_by_query_builder = @{
     client: client,
-    mut indices: [str],
-    mut types: [str],
+    mut indices: ~[str],
+    mut types: ~[str],
 
     mut consistency: consistency,
     mut refresh: bool,
@@ -666,8 +662,8 @@ type delete_by_query_builder = @{
 fn delete_by_query_builder(client: client) -> delete_by_query_builder {
     @{
         client: client,
-        mut indices: [],
-        mut types: [],
+        mut indices: ~[],
+        mut types: ~[],
 
         mut consistency: CONSISTENCY_DEFAULT,
         mut refresh: false,
@@ -680,11 +676,11 @@ fn delete_by_query_builder(client: client) -> delete_by_query_builder {
 }
 
 impl delete_by_query_builder for delete_by_query_builder {
-    fn set_indices(+indices: [str]) -> delete_by_query_builder {
+    fn set_indices(+indices: ~[str]) -> delete_by_query_builder {
         self.indices = indices;
         self
     }
-    fn set_types(+types: [str]) -> delete_by_query_builder {
+    fn set_types(+types: ~[str]) -> delete_by_query_builder {
         self.types = types;
         self
     }
@@ -713,7 +709,7 @@ impl delete_by_query_builder for delete_by_query_builder {
         self
     }
     fn execute() -> response {
-        let mut path = [];
+        let mut path = ~[];
 
         vec::push(path, str::connect(self.indices, ","));
         vec::push(path, str::connect(self.types, ","));
@@ -722,7 +718,7 @@ impl delete_by_query_builder for delete_by_query_builder {
         let mut path = str::connect(path, "/");
 
         // Build the query parameters.
-        let mut params = [];
+        let mut params = ~[];
 
         alt self.consistency {
           CONSISTENCY_DEFAULT {}
@@ -772,7 +768,7 @@ impl json_list_builder for json_list_builder {
     fn push_list(f: fn(json_list_builder)) -> json_list_builder {
         let builder = json_list_builder();
         f(builder);
-        let builder <- *builder;
+        let builder <- copy *builder;
         self.push(vec::from_mut(dvec::unwrap(builder)))
     }
 
@@ -782,7 +778,6 @@ impl json_list_builder for json_list_builder {
         self.push(*builder)
     }
 }
-
 
 type json_dict_builder = @hashmap<str, json>;
 
@@ -799,7 +794,7 @@ impl json_dict_builder for json_dict_builder {
     fn insert_list(+key: str, f: fn(json_list_builder)) -> json_dict_builder {
         let builder = json_list_builder();
         f(builder);
-        let builder <- *builder;
+        let builder <- copy *builder;
         self.insert(key, vec::from_mut(dvec::unwrap(builder)))
     }
 
@@ -835,7 +830,7 @@ impl of transport for zmq_transport {
     fn send(request: str) -> response {
         #debug("request: %s", request);
 
-        str::as_bytes(request) { |bytes|
+        do str::as_bytes(request) |bytes| {
             // The Elasticsearch ZMQ transpot expects there to be no trailing
             // \0.
             let bytes = vec::view(bytes, 0u, bytes.len() - 1u);
@@ -848,7 +843,7 @@ impl of transport for zmq_transport {
 
         alt self.socket.recv(0) {
           ok(msg) {
-            #debug("response: %s", str::from_bytes(msg));
+            #debug("response: %s", str::from_bytes(copy msg));
             response::parse(msg)
           }
           err(e) { fail e.to_str(); }
@@ -887,7 +882,7 @@ type response = {
 };
 
 mod response {
-    fn parse(msg: [u8]) -> response {
+    fn parse(msg: ~[u8]) -> response {
         let end = vec::len(msg);
 
         let (start, code) = parse_code(msg, end);
@@ -897,8 +892,8 @@ mod response {
         { code: code, status: status, body: body }
     }
 
-    fn parse_code(msg: [u8], end: uint) -> (uint, uint) {
-        alt vec::position_between(msg, 0u, end) { |c| c == '|' as u8 } {
+    fn parse_code(msg: ~[u8], end: uint) -> (uint, uint) {
+        alt vec::position_between(msg, 0u, end, |c| c == '|' as u8) {
           none { fail "invalid response" }
           some(i) {
             alt uint::parse_buf(vec::slice(msg, 0u, i), 10u) {
@@ -909,17 +904,17 @@ mod response {
         }
     }
 
-    fn parse_status(msg: [u8], start: uint, end: uint) -> (uint, str) {
-        alt vec::position_between(msg, start, end) { |c| c == '|' as u8 } {
+    fn parse_status(msg: ~[u8], start: uint, end: uint) -> (uint, str) {
+        alt vec::position_between(msg, start, end, |c| c == '|' as u8) {
           none { fail "invalid response" }
           some(i) { (i + 1u, str::from_bytes(vec::slice(msg, start, i))) }
         }
     }
 
-    fn parse_body(msg: [u8], start: uint, end: uint) -> json {
+    fn parse_body(msg: ~[u8], start: uint, end: uint) -> json {
         if start == end { ret json::null; }
 
-        io::with_bytes_reader_between(msg, start, end) { |rdr|
+        do io::with_bytes_reader_between(msg, start, end) |rdr| {
             alt json::from_reader(rdr) {
               ok(json) { json }
               err(e) { fail e.to_str(); }

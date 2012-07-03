@@ -4,6 +4,7 @@ use elasticsearch;
 
 import result::{ok, err};
 import std::json::to_json;
+import std::map::str_hash;
 import zmq::{context, to_str};
 import elasticsearch::{
     client,
@@ -27,12 +28,11 @@ fn main() {
     io::println(#fmt("%?\n", client.transport.get("/")));
 
     io::println(#fmt("%?\n", client.prepare_create_index("test")
-      .set_source(*json_dict_builder()
-          .insert_dict("settings") { |bld|
-              bld
-                .insert("index.number_of_shards", 1u)
-                .insert("index.number_of_replicas", 0u);
-          }
+        .set_source(*json_dict_builder()
+            .insert_dict("settings", |bld| {
+                bld.insert("index.number_of_shards", 1u)
+                   .insert("index.number_of_replicas", 0u);
+            })
       )
       .execute()));
 
@@ -44,12 +44,8 @@ fn main() {
       .set_source(*json_dict_builder()
           .insert("foo", 5.0)
           .insert("bar", "wee")
-          .insert_dict("baz") { |bld|
-              bld.insert("a", 2.0);
-          }
-          .insert_list("boo") { |bld|
-              bld.push(1.0).push("zzz");
-          }
+          .insert_dict("baz", |bld| { bld.insert("a", 2.0); })
+          .insert_list("boo", |bld| { bld.push(1.0).push("zzz"); })
       )
       .set_refresh(true)
       .execute()));
@@ -57,9 +53,9 @@ fn main() {
     io::println(#fmt("%?\n", client.get("test", "test", "1")));
 
     io::println(#fmt("%?\n", client.prepare_search()
-      .set_indices(["test"])
+      .set_indices(~["test"])
       .set_source(*json_dict_builder()
-          .insert("fields", ["foo", "bar"])
+          .insert("fields", ~["foo", "bar"])
       )
       .execute()));
 
@@ -74,15 +70,13 @@ fn main() {
       .execute()));
 
     io::println(#fmt("%?\n", client.prepare_delete_by_query()
-      .set_indices(["test"])
+      .set_indices(~["test"])
       .set_source(*json_dict_builder()
-          .insert_dict("term") { |bld|
-              bld.insert("bar", "lala");
-          }
+          .insert_dict("term", |bld| { bld.insert("bar", "lala"); })
       )
       .execute()));
 
     io::println(#fmt("%?\n", client.prepare_delete_index()
-      .set_indices(["test"])
+      .set_indices(~["test"])
       .execute()));
 }
