@@ -850,10 +850,9 @@ impl of transport for zmq_transport {
 
 #[doc = "Create a zeromq transport to Elasticsearch"]
 fn zmq_transport(ctx: zmq::context, addr: str) -> transport {
-    let socket = alt ctx.socket(zmq::REQ) {
-      ok(socket) { socket }
-      err(e) { fail e.to_str() }
-    };
+    let socket = ctx.socket(zmq::REQ);
+    if socket.is_err() { fail socket.get_err().to_str() };
+    let socket = result::unwrap(socket);
 
     alt socket.connect(addr) {
       ok(()) {}
