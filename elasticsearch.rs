@@ -830,15 +830,9 @@ impl of transport for zmq_transport {
     fn send(request: str) -> response {
         #debug("request: %s", request);
 
-        do str::as_bytes(request) |bytes| {
-            // The Elasticsearch ZMQ transpot expects there to be no trailing
-            // \0.
-            let bytes = vec::view(bytes, 0u, bytes.len() - 1u);
-
-            alt self.socket.send(bytes, 0) {
-              ok(()) {}
-              err(e) { fail e.to_str(); }
-            }
+        alt self.socket.send_str(request, 0) {
+          ok(()) { }
+          err(e) { fail e.to_str(); }
         }
 
         alt self.socket.recv(0) {

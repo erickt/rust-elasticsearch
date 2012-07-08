@@ -15,5 +15,5 @@ import std::map::{hashmap, str_hash};
 import std::json::json;
 import json::{to_json, to_str};
 
-import zmq::{context, socket, to_str};
+import zmq::{context, socket, socket_util, to_str};
 import uri::encode_uri_component;
