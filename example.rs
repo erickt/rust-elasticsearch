@@ -45,7 +45,7 @@ fn main() {
           .insert("foo", 5.0)
           .insert("bar", "wee")
           .insert_dict("baz", |bld| { bld.insert("a", 2.0); })
-          .insert_list("boo", |bld| { bld.push(1.0).push("zzz"); })
+          .insert_list("boo", |bld| { bld.push("aaa").push("zzz"); })
       )
       .set_refresh(true)
       .execute()));
