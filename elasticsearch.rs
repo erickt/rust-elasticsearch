@@ -1,51 +1,51 @@
-export transport, zmq_transport, connect_with_zmq;
-export client;
+export Transport, ZMQTransport, connect_with_zmq;
+export Client;
 export consistency;
 export replication;
-export op_type;
-export version_type;
-export create_index_builder;
-export delete_index_builder;
-export index_builder;
-export search_type;
-export search_builder;
-export delete_builder;
-export delete_by_query_builder;
-export json_dict_builder;
-export json_list_builder;
-export response;
+export OpType;
+export VersionType;
+export CreateIndexBuilder;
+export DeleteIndexBuilder;
+export IndexBuilder;
+export SearchType;
+export SearchBuilder;
+export DeleteBuilder;
+export DeleteByQueryBuilder;
+export JsonDictBuilder;
+export JsonListBuilder;
+export Response;
 
 #[doc = "The low level interface to elasticsearch"]
-trait transport {
-    fn head(path: &str) -> response;
-    fn get(path: &str) -> response;
-    fn put(path: &str, source: HashMap<~str, Json>) -> response;
-    fn post(path: &str, source: HashMap<~str, Json>) -> response;
-    fn delete(path: &str, source: Option<HashMap<~str, Json>>) -> response;
+trait Transport {
+    fn head(path: &str) -> Response;
+    fn get(path: &str) -> Response;
+    fn put(path: &str, source: HashMap<~str, Json>) -> Response;
+    fn post(path: &str, source: HashMap<~str, Json>) -> Response;
+    fn delete(path: &str, source: Option<HashMap<~str, Json>>) -> Response;
     fn term();
 }
 
 #[doc = "The high level interface to elasticsearch"]
-struct client { transport: transport }
+struct Client { transport: Transport }
 
 #[doc = "Create an elasticsearch client"]
-fn client(transport: transport) -> client {
-    client { transport: transport }
+fn Client(transport: Transport) -> Client {
+    Client { transport: transport }
 }
 
-impl client {
+impl Client {
     #[doc = "Create an index"]
-    fn prepare_create_index(index: ~str) -> @create_index_builder {
-        create_index_builder(self, index)
+    fn prepare_create_index(index: ~str) -> @CreateIndexBuilder {
+        CreateIndexBuilder(self, index)
     }
 
     #[doc = "Delete indices"]
-    fn prepare_delete_index() -> @delete_index_builder {
-        delete_index_builder(self)
+    fn prepare_delete_index() -> @DeleteIndexBuilder {
+        DeleteIndexBuilder(self)
     }
 
     #[doc = "Get a specific document"]
-    fn get(index: &str, typ: &str, id: &str) -> response {
+    fn get(index: &str, typ: &str, id: &str) -> Response {
         let path = str::connect(~[
             net_url::encode_component(index),
             net_url::encode_component(typ),
@@ -55,28 +55,28 @@ impl client {
     }
 
     #[doc = "Create an index builder that will create documents"]
-    fn prepare_index(+index: ~str, +typ: ~str) -> @index_builder {
-        index_builder(self, index, typ)
+    fn prepare_index(+index: ~str, +typ: ~str) -> @IndexBuilder {
+        IndexBuilder(self, index, typ)
     }
 
     #[doc = "Create a search builder that will query elasticsearch"]
-    fn prepare_search() -> @search_builder {
-        search_builder(self)
+    fn prepare_search() -> @SearchBuilder {
+        SearchBuilder(self)
     }
 
     #[doc = "Delete a document"]
-    fn delete(index: ~str, typ: ~str, id: ~str) -> response {
+    fn delete(index: ~str, typ: ~str, id: ~str) -> Response {
         self.prepare_delete(index, typ, id).execute()
     }
 
     #[doc = "Delete a document"]
-    fn prepare_delete(+index: ~str, +typ: ~str, +id: ~str) -> @delete_builder {
-        delete_builder(self, index, typ, id)
+    fn prepare_delete(+index: ~str, +typ: ~str, +id: ~str) -> @DeleteBuilder {
+        DeleteBuilder(self, index, typ, id)
     }
 
     #[doc = "Create a search builder that will query elasticsearch"]
-    fn prepare_delete_by_query() -> @delete_by_query_builder {
-        delete_by_query_builder(self)
+    fn prepare_delete_by_query() -> @DeleteByQueryBuilder {
+        DeleteByQueryBuilder(self)
     }
 
     #[doc = "Shut down the transport"]
@@ -87,11 +87,11 @@ impl client {
 
 enum consistency { CONSISTENCY_DEFAULT, ONE, QUORUM, ALL }
 enum replication { REPLICATION_DEFAULT, SYNC, ASYNC }
-enum op_type { CREATE, INDEX }
-enum version_type { INTERNAL, EXTERNAL }
+enum OpType { CREATE, INDEX }
+enum VersionType { INTERNAL, EXTERNAL }
 
-struct create_index_builder {
-    client: client,
+struct CreateIndexBuilder {
+    client: Client,
     index: ~str,
 
     mut timeout: Option<~str>,
@@ -99,8 +99,8 @@ struct create_index_builder {
     mut source: Option<@HashMap<~str, Json>>,
 }
 
-fn create_index_builder(client: client, +index: ~str) -> @create_index_builder {
-    @create_index_builder {
+fn CreateIndexBuilder(client: Client, +index: ~str) -> @CreateIndexBuilder {
+    @CreateIndexBuilder {
         client: client,
         index: index,
 
@@ -110,16 +110,16 @@ fn create_index_builder(client: client, +index: ~str) -> @create_index_builder {
     }
 }
 
-impl create_index_builder {
-    fn set_timeout(+timeout: ~str) -> create_index_builder {
+impl CreateIndexBuilder {
+    fn set_timeout(+timeout: ~str) -> CreateIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(source: HashMap<~str, Json>) -> create_index_builder {
+    fn set_source(source: HashMap<~str, Json>) -> CreateIndexBuilder {
         self.source = Some(@source);
         self
     }
-    fn execute() -> response {
+    fn execute() -> Response {
         let mut path = net_url::encode_component(self.index);
 
         let mut params = ~[];
@@ -141,30 +141,30 @@ impl create_index_builder {
     }
 }
 
-struct delete_index_builder {
-    client: client,
+struct DeleteIndexBuilder {
+    client: Client,
     mut indices: ~[~str],
     mut timeout: Option<~str>,
 }
 
-fn delete_index_builder(client: client) -> @delete_index_builder {
-    @delete_index_builder {
+fn DeleteIndexBuilder(client: Client) -> @DeleteIndexBuilder {
+    @DeleteIndexBuilder {
         client: client,
         mut indices: ~[],
         mut timeout: None,
     }
 }
 
-impl delete_index_builder {
-    fn set_indices(+indices: ~[~str]) -> delete_index_builder {
+impl DeleteIndexBuilder {
+    fn set_indices(+indices: ~[~str]) -> DeleteIndexBuilder {
         self.indices = indices;
         self
     }
-    fn set_timeout(+timeout: ~str) -> delete_index_builder {
+    fn set_timeout(+timeout: ~str) -> DeleteIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn execute() -> response {
+    fn execute() -> Response {
         let indices = do (copy self.indices).map |i| {
             net_url::encode_component(*i)
         };
@@ -187,14 +187,14 @@ impl delete_index_builder {
     }
 }
 
-struct index_builder {
-    client: client,
+struct IndexBuilder {
+    client: Client,
     index: ~str,
     typ: ~str,
     mut id: Option<~str>,
 
     mut consistency: consistency,
-    mut op_type: op_type,
+    mut op_type: OpType,
     mut parent: Option<~str>,
     mut percolate: Option<~str>,
     mut refresh: bool,
@@ -204,13 +204,13 @@ struct index_builder {
     mut timestamp: Option<~str>,
     mut ttl: Option<~str>,
     mut version: Option<uint>,
-    mut version_type: version_type,
+    mut version_type: VersionType,
 
     mut source: Option<HashMap<~str, Json>>,
 }
 
-fn index_builder(client: client, +index: ~str, +typ: ~str) -> @index_builder {
-    @index_builder {
+fn IndexBuilder(client: Client, +index: ~str, +typ: ~str) -> @IndexBuilder {
+    @IndexBuilder {
         client: client,
         index: index,
         typ: typ,
@@ -233,64 +233,64 @@ fn index_builder(client: client, +index: ~str, +typ: ~str) -> @index_builder {
     }
 }
 
-impl index_builder {
-    fn set_id(+id: ~str) -> index_builder {
+impl IndexBuilder {
+    fn set_id(+id: ~str) -> IndexBuilder {
         self.id = Some(id);
         self
     }
-    fn set_consistency(consistency: consistency) -> index_builder {
+    fn set_consistency(consistency: consistency) -> IndexBuilder {
         self.consistency = consistency;
         self
     }
-    fn set_op_type(op_type: op_type) -> index_builder {
+    fn set_op_type(op_type: OpType) -> IndexBuilder {
         self.op_type = op_type;
         self
     }
-    fn set_parent(+parent: ~str) -> index_builder {
+    fn set_parent(+parent: ~str) -> IndexBuilder {
         self.parent = Some(parent);
         self
     }
-    fn set_percolate(+percolate: ~str) -> index_builder {
+    fn set_percolate(+percolate: ~str) -> IndexBuilder {
         self.percolate = Some(percolate);
         self
     }
-    fn set_refresh(refresh: bool) -> index_builder {
+    fn set_refresh(refresh: bool) -> IndexBuilder {
         self.refresh = refresh;
         self
     }
-    fn set_replication(replication: replication) -> index_builder {
+    fn set_replication(replication: replication) -> IndexBuilder {
         self.replication = replication;
         self
     }
-    fn set_routing(+routing: ~str) -> index_builder {
+    fn set_routing(+routing: ~str) -> IndexBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(+timeout: ~str) -> index_builder {
+    fn set_timeout(+timeout: ~str) -> IndexBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_timestamp(+timestamp: ~str) -> index_builder {
+    fn set_timestamp(+timestamp: ~str) -> IndexBuilder {
         self.timestamp = Some(timestamp);
         self
     }
-    fn set_ttl(+ttl: ~str) -> index_builder {
+    fn set_ttl(+ttl: ~str) -> IndexBuilder {
         self.ttl = Some(ttl);
         self
     }
-    fn set_version(version: uint) -> index_builder {
+    fn set_version(version: uint) -> IndexBuilder {
         self.version = Some(version);
         self
     }
-    fn set_version_type(version_type: version_type) -> index_builder {
+    fn set_version_type(version_type: VersionType) -> IndexBuilder {
         self.version_type = version_type;
         self
     }
-    fn set_source(source: HashMap<~str, Json>) -> index_builder {
+    fn set_source(source: HashMap<~str, Json>) -> IndexBuilder {
         self.source = Some(source);
         self
     }
-    fn execute() -> response {
+    fn execute() -> Response {
         let mut path = ~[
             net_url::encode_component(self.index),
             net_url::encode_component(self.typ)
@@ -384,7 +384,7 @@ impl index_builder {
     }
 }
 
-enum search_type {
+enum SearchType {
     SEARCH_DEFAULT,
     DFS_QUERY_THEN_FETCH,
     QUERY_THEN_FETCH,
@@ -394,22 +394,22 @@ enum search_type {
     COUNT,
 }
 
-struct search_builder {
-    client: client,
+struct SearchBuilder {
+    client: Client,
     mut indices: ~[~str],
     mut types: ~[~str],
 
     mut preference: Option<~str>,
     mut routing: Option<~str>,
     mut scroll: Option<~str>,
-    mut search_type: search_type,
+    mut search_type: SearchType,
     mut timeout: Option<~str>,
 
     mut source: Option<HashMap<~str, Json>>
 }
 
-fn search_builder(client: client) -> @search_builder {
-    @search_builder {
+fn SearchBuilder(client: Client) -> @SearchBuilder {
+    @SearchBuilder {
         client: client,
         mut indices: ~[],
         mut types: ~[],
@@ -424,40 +424,40 @@ fn search_builder(client: client) -> @search_builder {
     }
 }
 
-impl search_builder {
-    fn set_indices(+indices: ~[~str]) -> search_builder {
+impl SearchBuilder {
+    fn set_indices(+indices: ~[~str]) -> SearchBuilder {
         self.indices = indices;
         self
     }
-    fn set_types(+types: ~[~str]) -> search_builder {
+    fn set_types(+types: ~[~str]) -> SearchBuilder {
         self.types = types;
         self
     }
-    fn set_preference(+preference: ~str) -> search_builder {
+    fn set_preference(+preference: ~str) -> SearchBuilder {
         self.preference = Some(preference);
         self
     }
-    fn set_routing(+routing: ~str) -> search_builder {
+    fn set_routing(+routing: ~str) -> SearchBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_scroll(+scroll: ~str) -> search_builder {
+    fn set_scroll(+scroll: ~str) -> SearchBuilder {
         self.scroll = Some(scroll);
         self
     }
-    fn set_search_type(search_type: search_type) -> search_builder {
+    fn set_search_type(search_type: SearchType) -> SearchBuilder {
         self.search_type = search_type;
         self
     }
-    fn set_timeout(+timeout: ~str) -> search_builder {
+    fn set_timeout(+timeout: ~str) -> SearchBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(source: HashMap<~str, Json>) -> search_builder {
+    fn set_source(source: HashMap<~str, Json>) -> SearchBuilder {
         self.source = Some(source);
         self
     }
-    fn execute() -> response {
+    fn execute() -> Response {
         let indices = do (copy self.indices).map |i| {
             net_url::encode_component(*i)
         };
@@ -527,8 +527,8 @@ impl search_builder {
     }
 }
 
-struct delete_builder {
-    client: client,
+struct DeleteBuilder {
+    client: Client,
     index: ~str,
     typ: ~str,
     id: ~str,
@@ -539,16 +539,16 @@ struct delete_builder {
     mut routing: Option<~str>,
     mut timeout: Option<~str>,
     mut version: Option<uint>,
-    mut version_type: version_type,
+    mut version_type: VersionType,
 }
 
-fn delete_builder(
-    client: client,
+fn DeleteBuilder(
+    client: Client,
     +index: ~str,
     +typ: ~str,
     +id: ~str
-) -> @delete_builder {
-    @delete_builder {
+) -> @DeleteBuilder {
+    @DeleteBuilder {
         client: client,
         index: index,
         typ: typ,
@@ -563,41 +563,41 @@ fn delete_builder(
     }
 }
 
-impl delete_builder {
-    fn set_consistency(consistency: consistency) -> delete_builder {
+impl DeleteBuilder {
+    fn set_consistency(consistency: consistency) -> DeleteBuilder {
         self.consistency = consistency;
         self
     }
-    fn set_parent(+parent: ~str) -> delete_builder {
+    fn set_parent(+parent: ~str) -> DeleteBuilder {
         // We use the parent for routing.
         self.routing = Some(parent);
         self
     }
-    fn set_refresh(refresh: bool) -> delete_builder {
+    fn set_refresh(refresh: bool) -> DeleteBuilder {
         self.refresh = refresh;
         self
     }
-    fn set_replication(replication: replication) -> delete_builder {
+    fn set_replication(replication: replication) -> DeleteBuilder {
         self.replication = replication;
         self
     }
-    fn set_routing(+routing: ~str) -> delete_builder {
+    fn set_routing(+routing: ~str) -> DeleteBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(+timeout: ~str) -> delete_builder {
+    fn set_timeout(+timeout: ~str) -> DeleteBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_version(version: uint) -> delete_builder {
+    fn set_version(version: uint) -> DeleteBuilder {
         self.version = Some(version);
         self
     }
-    fn set_version_type(version_type: version_type) -> delete_builder {
+    fn set_version_type(version_type: VersionType) -> DeleteBuilder {
         self.version_type = version_type;
         self
     }
-    fn execute() -> response {
+    fn execute() -> Response {
         let mut path = str::connect(~[
             net_url::encode_component(self.index),
             net_url::encode_component(self.typ),
@@ -649,8 +649,8 @@ impl delete_builder {
     }
 }
 
-struct delete_by_query_builder {
-    client: client,
+struct DeleteByQueryBuilder {
+    client: Client,
     mut indices: ~[~str],
     mut types: ~[~str],
 
@@ -663,8 +663,8 @@ struct delete_by_query_builder {
     mut source: Option<HashMap<~str, Json>>,
 }
 
-fn delete_by_query_builder(client: client) -> @delete_by_query_builder {
-    @delete_by_query_builder {
+fn DeleteByQueryBuilder(client: Client) -> @DeleteByQueryBuilder {
+    @DeleteByQueryBuilder {
         client: client,
         mut indices: ~[],
         mut types: ~[],
@@ -679,41 +679,41 @@ fn delete_by_query_builder(client: client) -> @delete_by_query_builder {
     }
 }
 
-impl delete_by_query_builder {
-    fn set_indices(+indices: ~[~str]) -> delete_by_query_builder {
+impl DeleteByQueryBuilder {
+    fn set_indices(+indices: ~[~str]) -> DeleteByQueryBuilder {
         self.indices = indices;
         self
     }
-    fn set_types(+types: ~[~str]) -> delete_by_query_builder {
+    fn set_types(+types: ~[~str]) -> DeleteByQueryBuilder {
         self.types = types;
         self
     }
-    fn set_consistency(consistency: consistency) -> delete_by_query_builder {
+    fn set_consistency(consistency: consistency) -> DeleteByQueryBuilder {
         self.consistency = consistency;
         self
     }
-    fn set_refresh(refresh: bool) -> delete_by_query_builder {
+    fn set_refresh(refresh: bool) -> DeleteByQueryBuilder {
         self.refresh = refresh;
         self
     }
-    fn set_replication(replication: replication) -> delete_by_query_builder {
+    fn set_replication(replication: replication) -> DeleteByQueryBuilder {
         self.replication = replication;
         self
     }
-    fn set_routing(+routing: ~str) -> delete_by_query_builder {
+    fn set_routing(+routing: ~str) -> DeleteByQueryBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(+timeout: ~str) -> delete_by_query_builder {
+    fn set_timeout(+timeout: ~str) -> DeleteByQueryBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(source: HashMap<~str, Json>) -> delete_by_query_builder {
+    fn set_source(source: HashMap<~str, Json>) -> DeleteByQueryBuilder {
         self.source = Some(source);
         self
     }
 
-    fn execute() -> response {
+    fn execute() -> Response {
         let mut path = ~[];
 
         vec::push(path, str::connect(self.indices, ","));
@@ -758,78 +758,78 @@ impl delete_by_query_builder {
     }
 }
 
-pub struct json_list_builder {
+pub struct JsonListBuilder {
     list: DVec<Json>
 }
 
-pub fn json_list_builder() -> @json_list_builder {
-    @json_list_builder { list: dvec::DVec() }
+pub fn JsonListBuilder() -> @JsonListBuilder {
+    @JsonListBuilder { list: dvec::DVec() }
 }
 
-priv impl json_list_builder {
+priv impl JsonListBuilder {
     fn consume() -> ~[Json] {
         dvec::unwrap(self.list)
     }
 }
 
-pub impl json_list_builder {
-    fn push<T: ToJson>(self, value: T) -> json_list_builder {
+pub impl JsonListBuilder {
+    fn push<T: ToJson>(self, value: T) -> JsonListBuilder {
         self.list.push(value.to_json());
         self
     }
 
-    fn push_list(self, f: fn(builder: &json_list_builder)) -> json_list_builder {
-        let builder = json_list_builder();
+    fn push_list(self, f: fn(builder: &JsonListBuilder)) -> JsonListBuilder {
+        let builder = JsonListBuilder();
         f(&*builder);
         self.push(builder.consume())
     }
 
-    fn push_dict(self, f: fn(builder: &json_dict_builder)) -> json_list_builder {
-        let builder = json_dict_builder();
+    fn push_dict(self, f: fn(builder: &JsonDictBuilder)) -> JsonListBuilder {
+        let builder = JsonDictBuilder();
         f(builder);
         self.push(builder.dict)
     }
 }
 
-pub struct json_dict_builder { dict: HashMap<~str, Json> }
+pub struct JsonDictBuilder { dict: HashMap<~str, Json> }
 
-pub fn json_dict_builder() -> @json_dict_builder {
-    @json_dict_builder { dict: HashMap() }
+pub fn JsonDictBuilder() -> @JsonDictBuilder {
+    @JsonDictBuilder { dict: HashMap() }
 }
 
-pub impl json_dict_builder {
-    fn insert<T: ToJson>(self, key: ~str, value: T) -> json_dict_builder {
+pub impl JsonDictBuilder {
+    fn insert<T: ToJson>(self, key: ~str, value: T) -> JsonDictBuilder {
         self.dict.insert(key, value.to_json());
         self
     }
 
-    fn insert_list(self, key: ~str, f: fn(builder: &json_list_builder)) -> json_dict_builder {
-        let builder = json_list_builder();
+    fn insert_list(self, key: ~str, f: fn(builder: &JsonListBuilder)) -> JsonDictBuilder {
+        let builder = JsonListBuilder();
         f(&*builder);
         self.insert(key, builder.consume())
     }
 
-    fn insert_dict(self, key: ~str, f: fn(builder: &json_dict_builder)) -> json_dict_builder {
-        let builder = json_dict_builder();
+    fn insert_dict(self, key: ~str, f: fn(builder: &JsonDictBuilder)) -> JsonDictBuilder {
+        let builder = JsonDictBuilder();
         f(builder);
         self.insert(key, builder.dict)
     }
 }
 
 #[doc = "Transport to talk to Elasticsearch with zeromq"]
-pub struct zmq_transport { socket: zmq::Socket }
+pub struct ZMQTransport { socket: zmq::Socket }
 
 #[doc = "Zeromq transport implementation"]
-pub impl zmq_transport: transport {
-    fn head(path: &str) -> response { self.send(fmt!("HEAD|%s", path)) }
-    fn get(path: &str) -> response { self.send(fmt!("GET|%s", path)) }
-    fn put(path: &str, source: HashMap<~str, Json>) -> response {
+pub impl ZMQTransport: Transport {
+    fn head(path: &str) -> Response { self.send(fmt!("HEAD|%s", path)) }
+    fn get(path: &str) -> Response { self.send(fmt!("GET|%s", path)) }
+    fn put(path: &str, source: HashMap<~str, Json>) -> Response {
         self.send(fmt!("PUT|%s|%s", path, json::Dict(source).to_str()))
     }
-    fn post(path: &str, source: HashMap<~str, Json>) -> response {
+    fn post(path: &str, source: HashMap<~str, Json>) -> Response {
         self.send(fmt!("POST|%s|%s", path, json::Dict(source).to_str()))
     }
-    fn delete(path: &str, source: Option<HashMap<~str, Json>>) -> response {
+    fn delete(path: &str, source: Option<HashMap<~str, Json>>) -> Response {
         match source {
           None => self.send(fmt!("DELETE|%s", path)),
           Some(source) =>
@@ -837,7 +837,7 @@ pub impl zmq_transport: transport {
         }
     }
 
-    fn send(request: &str) -> response {
+    fn send(request: &str) -> Response {
         #debug("request: %s", request);
 
         match self.socket.send_str(request, 0) {
@@ -860,7 +860,7 @@ pub impl zmq_transport: transport {
 }
 
 #[doc = "Create a zeromq transport to Elasticsearch"]
-pub fn zmq_transport(ctx: zmq::Context, addr: &str) -> transport {
+pub fn ZMQTransport(ctx: zmq::Context, addr: &str) -> Transport {
     let socket = ctx.socket(zmq::REQ);
     if socket.is_err() { fail socket.get_err().to_str() };
     let socket = result::unwrap(socket);
@@ -870,30 +870,30 @@ pub fn zmq_transport(ctx: zmq::Context, addr: &str) -> transport {
       Err(e) => fail e.to_str(),
     }
 
-    zmq_transport { socket: socket } as transport
+    ZMQTransport { socket: socket } as Transport
 }
 
 #[doc = "Helper function to creating a client with zeromq"]
-pub fn connect_with_zmq(ctx: zmq::Context, addr: &str) -> client {
-    let transport = zmq_transport(ctx, addr);
-    client(transport)
+pub fn connect_with_zmq(ctx: zmq::Context, addr: &str) -> Client {
+    let transport = ZMQTransport(ctx, addr);
+    Client(transport)
 }
 
-pub type response = {
+pub struct Response {
     code: uint,
     status: ~str,
     body: Json,
-};
+}
 
 pub mod response {
-    pub fn parse(msg: ~[u8]) -> response {
+    pub fn parse(msg: ~[u8]) -> Response {
         let end = msg.len();
 
         let (start, code) = parse_code(msg, end);
         let (start, status) = parse_status(msg, start, end);
         let body = parse_body(msg, start, end);
 
-        { code: code, status: status, body: body }
+        Response { code: code, status: status, body: body }
     }
 
     fn parse_code(msg: ~[u8], end: uint) -> (uint, uint) {
