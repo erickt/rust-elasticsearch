@@ -1,7 +1,7 @@
 export Transport, ZMQTransport, connect_with_zmq;
 export Client;
-export consistency;
-export replication;
+export Consistency;
+export Replication;
 export OpType;
 export VersionType;
 export CreateIndexBuilder;
@@ -85,8 +85,8 @@ impl Client {
     }
 }
 
-enum consistency { CONSISTENCY_DEFAULT, ONE, QUORUM, ALL }
-enum replication { REPLICATION_DEFAULT, SYNC, ASYNC }
+enum Consistency { One, Quorum, All }
+enum Replication { Sync, Async }
 enum OpType { CREATE, INDEX }
 enum VersionType { INTERNAL, EXTERNAL }
 
@@ -111,11 +111,11 @@ fn CreateIndexBuilder(client: Client, +index: ~str) -> @CreateIndexBuilder {
 }
 
 impl CreateIndexBuilder {
-    fn set_timeout(+timeout: ~str) -> CreateIndexBuilder {
+    fn set_timeout(@self, +timeout: ~str) -> @CreateIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(source: HashMap<~str, Json>) -> CreateIndexBuilder {
+    fn set_source(@self, source: HashMap<~str, Json>) -> @CreateIndexBuilder {
         self.source = Some(@source);
         self
     }
@@ -156,11 +156,11 @@ fn DeleteIndexBuilder(client: Client) -> @DeleteIndexBuilder {
 }
 
 impl DeleteIndexBuilder {
-    fn set_indices(+indices: ~[~str]) -> DeleteIndexBuilder {
+    fn set_indices(@self, +indices: ~[~str]) -> @DeleteIndexBuilder {
         self.indices = indices;
         self
     }
-    fn set_timeout(+timeout: ~str) -> DeleteIndexBuilder {
+    fn set_timeout(@self, +timeout: ~str) -> @DeleteIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
@@ -193,12 +193,12 @@ struct IndexBuilder {
     typ: ~str,
     mut id: Option<~str>,
 
-    mut consistency: consistency,
+    mut consistency: Option<Consistency>,
     mut op_type: OpType,
     mut parent: Option<~str>,
     mut percolate: Option<~str>,
     mut refresh: bool,
-    mut replication: replication,
+    mut replication: Option<Replication>,
     mut routing: Option<~str>,
     mut timeout: Option<~str>,
     mut timestamp: Option<~str>,
@@ -209,19 +209,19 @@ struct IndexBuilder {
     mut source: Option<HashMap<~str, Json>>,
 }
 
-fn IndexBuilder(client: Client, +index: ~str, +typ: ~str) -> @IndexBuilder {
+fn IndexBuilder(client: Client, index: ~str, typ: ~str) -> @IndexBuilder {
     @IndexBuilder {
         client: client,
         index: index,
         typ: typ,
         mut id: None,
 
-        mut consistency: CONSISTENCY_DEFAULT,
+        mut consistency: None,
         mut op_type: INDEX,
         mut parent: None,
         mut percolate: None,
         mut refresh: false,
-        mut replication: REPLICATION_DEFAULT,
+        mut replication: None,
         mut routing: None,
         mut timeout: None,
         mut timestamp: None,
@@ -234,59 +234,59 @@ fn IndexBuilder(client: Client, +index: ~str, +typ: ~str) -> @IndexBuilder {
 }
 
 impl IndexBuilder {
-    fn set_id(+id: ~str) -> IndexBuilder {
+    fn set_id(@self, id: ~str) -> @IndexBuilder {
         self.id = Some(id);
         self
     }
-    fn set_consistency(consistency: consistency) -> IndexBuilder {
-        self.consistency = consistency;
+    fn set_consistency(@self, consistency: Consistency) -> @IndexBuilder {
+        self.consistency = Some(consistency);
         self
     }
-    fn set_op_type(op_type: OpType) -> IndexBuilder {
+    fn set_op_type(@self, op_type: OpType) -> @IndexBuilder {
         self.op_type = op_type;
         self
     }
-    fn set_parent(+parent: ~str) -> IndexBuilder {
+    fn set_parent(@self, parent: ~str) -> @IndexBuilder {
         self.parent = Some(parent);
         self
     }
-    fn set_percolate(+percolate: ~str) -> IndexBuilder {
+    fn set_percolate(@self, percolate: ~str) -> @IndexBuilder {
         self.percolate = Some(percolate);
         self
     }
-    fn set_refresh(refresh: bool) -> IndexBuilder {
+    fn set_refresh(@self, refresh: bool) -> @IndexBuilder {
         self.refresh = refresh;
         self
     }
-    fn set_replication(replication: replication) -> IndexBuilder {
-        self.replication = replication;
+    fn set_replication(@self, replication: Replication) -> @IndexBuilder {
+        self.replication = Some(replication);
         self
     }
-    fn set_routing(+routing: ~str) -> IndexBuilder {
+    fn set_routing(@self, routing: ~str) -> @IndexBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(+timeout: ~str) -> IndexBuilder {
+    fn set_timeout(@self, timeout: ~str) -> @IndexBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_timestamp(+timestamp: ~str) -> IndexBuilder {
+    fn set_timestamp(@self, timestamp: ~str) -> @IndexBuilder {
         self.timestamp = Some(timestamp);
         self
     }
-    fn set_ttl(+ttl: ~str) -> IndexBuilder {
+    fn set_ttl(@self, ttl: ~str) -> @IndexBuilder {
         self.ttl = Some(ttl);
         self
     }
-    fn set_version(version: uint) -> IndexBuilder {
+    fn set_version(@self, version: uint) -> @IndexBuilder {
         self.version = Some(version);
         self
     }
-    fn set_version_type(version_type: VersionType) -> IndexBuilder {
+    fn set_version_type(@self, version_type: VersionType) -> @IndexBuilder {
         self.version_type = version_type;
         self
     }
-    fn set_source(source: HashMap<~str, Json>) -> IndexBuilder {
+    fn set_source(@self, source: HashMap<~str, Json>) -> @IndexBuilder {
         self.source = Some(source);
         self
     }
@@ -306,10 +306,10 @@ impl IndexBuilder {
         let mut params = ~[];
 
         match self.consistency {
-          CONSISTENCY_DEFAULT => { }
-          ONE => vec::push(params, ~"consistency=one"),
-          QUORUM => vec::push(params, ~"consistency=quorum"),
-          ALL => vec::push(params, ~"consistency=all"),
+            None => { },
+            Some(One) => vec::push(params, ~"consistency=one"),
+            Some(Quorum) => vec::push(params, ~"consistency=quorum"),
+            Some(All) => vec::push(params, ~"consistency=all"),
         }
 
         match self.op_type {
@@ -331,10 +331,10 @@ impl IndexBuilder {
 
         if self.refresh { vec::push(params, ~"refresh=true"); }
 
-        match copy self.replication {
-          REPLICATION_DEFAULT => { },
-          SYNC => vec::push(params, ~"replication=sync"),
-          ASYNC => vec::push(params, ~"replication=async"),
+        match self.replication {
+          None => { },
+          Some(Sync) => vec::push(params, ~"replication=sync"),
+          Some(Async) => vec::push(params, ~"replication=async"),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
@@ -385,13 +385,12 @@ impl IndexBuilder {
 }
 
 enum SearchType {
-    SEARCH_DEFAULT,
-    DFS_QUERY_THEN_FETCH,
-    QUERY_THEN_FETCH,
-    DFS_QUERY_AND_FETCH,
-    QUERY_AND_FETCH,
-    SCAN,
-    COUNT,
+    DfsQueryThenFetch,
+    QueryThenFetch,
+    DfsQueryAndFetch,
+    QueryAndFetch,
+    Scan,
+    Count,
 }
 
 struct SearchBuilder {
@@ -402,7 +401,7 @@ struct SearchBuilder {
     mut preference: Option<~str>,
     mut routing: Option<~str>,
     mut scroll: Option<~str>,
-    mut search_type: SearchType,
+    mut search_type: Option<SearchType>,
     mut timeout: Option<~str>,
 
     mut source: Option<HashMap<~str, Json>>
@@ -417,7 +416,7 @@ fn SearchBuilder(client: Client) -> @SearchBuilder {
         mut preference: None,
         mut routing: None,
         mut scroll: None,
-        mut search_type: SEARCH_DEFAULT,
+        mut search_type: None,
         mut timeout: None,
 
         mut source: None
@@ -425,35 +424,35 @@ fn SearchBuilder(client: Client) -> @SearchBuilder {
 }
 
 impl SearchBuilder {
-    fn set_indices(+indices: ~[~str]) -> SearchBuilder {
+    fn set_indices(@self, indices: ~[~str]) -> @SearchBuilder {
         self.indices = indices;
         self
     }
-    fn set_types(+types: ~[~str]) -> SearchBuilder {
+    fn set_types(@self, types: ~[~str]) -> @SearchBuilder {
         self.types = types;
         self
     }
-    fn set_preference(+preference: ~str) -> SearchBuilder {
+    fn set_preference(@self, preference: ~str) -> @SearchBuilder {
         self.preference = Some(preference);
         self
     }
-    fn set_routing(+routing: ~str) -> SearchBuilder {
+    fn set_routing(@self, routing: ~str) -> @SearchBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_scroll(+scroll: ~str) -> SearchBuilder {
+    fn set_scroll(@self, scroll: ~str) -> @SearchBuilder {
         self.scroll = Some(scroll);
         self
     }
-    fn set_search_type(search_type: SearchType) -> SearchBuilder {
-        self.search_type = search_type;
+    fn set_search_type(@self, search_type: SearchType) -> @SearchBuilder {
+        self.search_type = Some(search_type);
         self
     }
-    fn set_timeout(+timeout: ~str) -> SearchBuilder {
+    fn set_timeout(@self, timeout: ~str) -> @SearchBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(source: HashMap<~str, Json>) -> SearchBuilder {
+    fn set_source(@self, source: HashMap<~str, Json>) -> @SearchBuilder {
         self.source = Some(source);
         self
     }
@@ -496,16 +495,17 @@ impl SearchBuilder {
         }
 
         match self.search_type {
-          SEARCH_DEFAULT => { }
-          DFS_QUERY_THEN_FETCH =>
-            vec::push(params, ~"search_type=dfs_query_then_fetch"),
-          QUERY_THEN_FETCH =>
-            vec::push(params, ~"search_type=query_then_fetch"),
-          DFS_QUERY_AND_FETCH =>
-            vec::push(params, ~"search_type=dfs_query_and_fetch"),
-          QUERY_AND_FETCH => vec::push(params, ~"search_type=query_and_fetch"),
-          SCAN => vec::push(params, ~"search_type=scan"),
-          COUNT => vec::push(params, ~"search_type=count"),
+            None => { },
+            Some(DfsQueryThenFetch) =>
+                vec::push(params, ~"search_type=dfs_query_then_fetch"),
+            Some(QueryThenFetch) =>
+                vec::push(params, ~"search_type=query_then_fetch"),
+            Some(DfsQueryAndFetch) =>
+                vec::push(params, ~"search_type=dfs_query_and_fetch"),
+            Some(QueryAndFetch) =>
+                vec::push(params, ~"search_type=query_and_fetch"),
+            Some(Scan) => vec::push(params, ~"search_type=scan"),
+            Some(Count) => vec::push(params, ~"search_type=count"),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
@@ -533,9 +533,9 @@ struct DeleteBuilder {
     typ: ~str,
     id: ~str,
 
-    mut consistency: consistency,
+    mut consistency: Option<Consistency>,
     mut refresh: bool,
-    mut replication: replication,
+    mut replication: Option<Replication>,
     mut routing: Option<~str>,
     mut timeout: Option<~str>,
     mut version: Option<uint>,
@@ -553,9 +553,9 @@ fn DeleteBuilder(
         index: index,
         typ: typ,
         id: id,
-        mut consistency: CONSISTENCY_DEFAULT,
+        mut consistency: None,
         mut refresh: false,
-        mut replication: REPLICATION_DEFAULT,
+        mut replication: None,
         mut routing: None,
         mut timeout: None,
         mut version: None,
@@ -564,36 +564,36 @@ fn DeleteBuilder(
 }
 
 impl DeleteBuilder {
-    fn set_consistency(consistency: consistency) -> DeleteBuilder {
-        self.consistency = consistency;
+    fn set_consistency(@self, consistency: Consistency) -> @DeleteBuilder {
+        self.consistency = Some(consistency);
         self
     }
-    fn set_parent(+parent: ~str) -> DeleteBuilder {
+    fn set_parent(@self, parent: ~str) -> @DeleteBuilder {
         // We use the parent for routing.
         self.routing = Some(parent);
         self
     }
-    fn set_refresh(refresh: bool) -> DeleteBuilder {
+    fn set_refresh(@self, refresh: bool) -> @DeleteBuilder {
         self.refresh = refresh;
         self
     }
-    fn set_replication(replication: replication) -> DeleteBuilder {
-        self.replication = replication;
+    fn set_replication(@self, replication: Replication) -> @DeleteBuilder {
+        self.replication = Some(replication);
         self
     }
-    fn set_routing(+routing: ~str) -> DeleteBuilder {
+    fn set_routing(@self, routing: ~str) -> @DeleteBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(+timeout: ~str) -> DeleteBuilder {
+    fn set_timeout(@self, timeout: ~str) -> @DeleteBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_version(version: uint) -> DeleteBuilder {
+    fn set_version(@self, version: uint) -> @DeleteBuilder {
         self.version = Some(version);
         self
     }
-    fn set_version_type(version_type: VersionType) -> DeleteBuilder {
+    fn set_version_type(@self, version_type: VersionType) -> @DeleteBuilder {
         self.version_type = version_type;
         self
     }
@@ -608,18 +608,18 @@ impl DeleteBuilder {
         let mut params = ~[];
 
         match self.consistency {
-          CONSISTENCY_DEFAULT => { }
-          ONE => vec::push(params, ~"consistency=one"),
-          QUORUM => vec::push(params, ~"consistency=quorum"),
-          ALL => vec::push(params, ~"consistency=all"),
+            None => { },
+            Some(One) => vec::push(params, ~"consistency=one"),
+            Some(Quorum) => vec::push(params, ~"consistency=quorum"),
+            Some(All) => vec::push(params, ~"consistency=all"),
         }
 
         if self.refresh { vec::push(params, ~"refresh=true"); }
 
         match self.replication {
-          REPLICATION_DEFAULT => { }
-          SYNC => vec::push(params, ~"replication=sync"),
-          ASYNC => vec::push(params, ~"replication=async"),
+          None => { }
+          Some(Sync) => vec::push(params, ~"replication=sync"),
+          Some(Async) => vec::push(params, ~"replication=async"),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
@@ -654,9 +654,9 @@ struct DeleteByQueryBuilder {
     mut indices: ~[~str],
     mut types: ~[~str],
 
-    mut consistency: consistency,
+    mut consistency: Option<Consistency>,
     mut refresh: bool,
-    mut replication: replication,
+    mut replication: Option<Replication>,
     mut routing: Option<~str>,
     mut timeout: Option<~str>,
 
@@ -669,9 +669,9 @@ fn DeleteByQueryBuilder(client: Client) -> @DeleteByQueryBuilder {
         mut indices: ~[],
         mut types: ~[],
 
-        mut consistency: CONSISTENCY_DEFAULT,
+        mut consistency: None,
         mut refresh: false,
-        mut replication: REPLICATION_DEFAULT,
+        mut replication: None,
         mut routing: None,
         mut timeout: None,
 
@@ -680,35 +680,44 @@ fn DeleteByQueryBuilder(client: Client) -> @DeleteByQueryBuilder {
 }
 
 impl DeleteByQueryBuilder {
-    fn set_indices(+indices: ~[~str]) -> DeleteByQueryBuilder {
+    fn set_indices(@self, indices: ~[~str]) -> @DeleteByQueryBuilder {
         self.indices = indices;
         self
     }
-    fn set_types(+types: ~[~str]) -> DeleteByQueryBuilder {
+    fn set_types(@self, types: ~[~str]) -> @DeleteByQueryBuilder {
         self.types = types;
         self
     }
-    fn set_consistency(consistency: consistency) -> DeleteByQueryBuilder {
-        self.consistency = consistency;
+    fn set_consistency(
+        @self,
+        consistency: Consistency
+    ) -> @DeleteByQueryBuilder {
+        self.consistency = Some(consistency);
         self
     }
-    fn set_refresh(refresh: bool) -> DeleteByQueryBuilder {
+    fn set_refresh(@self, refresh: bool) -> @DeleteByQueryBuilder {
         self.refresh = refresh;
         self
     }
-    fn set_replication(replication: replication) -> DeleteByQueryBuilder {
-        self.replication = replication;
+    fn set_replication(
+        @self,
+        replication: Replication
+    ) -> @DeleteByQueryBuilder {
+        self.replication = Some(replication);
         self
     }
-    fn set_routing(+routing: ~str) -> DeleteByQueryBuilder {
+    fn set_routing(@self, routing: ~str) -> @DeleteByQueryBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(+timeout: ~str) -> DeleteByQueryBuilder {
+    fn set_timeout(@self, timeout: ~str) -> @DeleteByQueryBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(source: HashMap<~str, Json>) -> DeleteByQueryBuilder {
+    fn set_source(
+        @self,
+        source: HashMap<~str, Json>
+    ) -> @DeleteByQueryBuilder {
         self.source = Some(source);
         self
     }
@@ -726,18 +735,18 @@ impl DeleteByQueryBuilder {
         let mut params = ~[];
 
         match self.consistency {
-          CONSISTENCY_DEFAULT => { }
-          ONE => vec::push(params, ~"consistency=one"),
-          QUORUM => vec::push(params, ~"consistency=quorum"),
-          ALL => vec::push(params, ~"consistency=all"),
+            None => {}
+            Some(One) => vec::push(params, ~"consistency=one"),
+            Some(Quorum) => vec::push(params, ~"consistency=quorum"),
+            Some(All) => vec::push(params, ~"consistency=all"),
         }
 
         if self.refresh { vec::push(params, ~"refresh=true"); }
 
         match self.replication {
-          REPLICATION_DEFAULT => { }
-          SYNC  => vec::push(params, ~"replication=sync"),
-          ASYNC => vec::push(params, ~"replication=async"),
+          None => { }
+          Some(Sync)  => vec::push(params, ~"replication=sync"),
+          Some(Async) => vec::push(params, ~"replication=async"),
         }
 
         match copy self.routing {
@@ -759,32 +768,32 @@ impl DeleteByQueryBuilder {
 }
 
 pub struct JsonListBuilder {
-    list: DVec<Json>
+    list: Cell<DVec<Json>>
 }
 
 pub fn JsonListBuilder() -> @JsonListBuilder {
-    @JsonListBuilder { list: dvec::DVec() }
+    @JsonListBuilder { list: Cell(DVec()) }
 }
 
 priv impl JsonListBuilder {
     fn consume() -> ~[Json] {
-        dvec::unwrap(self.list)
+        dvec::unwrap(self.list.take())
     }
 }
 
 pub impl JsonListBuilder {
-    fn push<T: ToJson>(self, value: T) -> JsonListBuilder {
-        self.list.push(value.to_json());
+    fn push<T: ToJson>(@self, value: T) -> @JsonListBuilder {
+        self.list.with_ref(|list| list.push(value.to_json()));
         self
     }
 
-    fn push_list(self, f: fn(builder: &JsonListBuilder)) -> JsonListBuilder {
+    fn push_list(@self, f: fn(builder: @JsonListBuilder)) -> @JsonListBuilder {
         let builder = JsonListBuilder();
-        f(&*builder);
+        f(builder);
         self.push(builder.consume())
     }
 
-    fn push_dict(self, f: fn(builder: &JsonDictBuilder)) -> JsonListBuilder {
+    fn push_dict(@self, f: fn(builder: @JsonDictBuilder)) -> @JsonListBuilder {
         let builder = JsonDictBuilder();
         f(builder);
         self.push(builder.dict)
@@ -798,18 +807,26 @@ pub fn JsonDictBuilder() -> @JsonDictBuilder {
 }
 
 pub impl JsonDictBuilder {
-    fn insert<T: ToJson>(self, key: ~str, value: T) -> JsonDictBuilder {
+    fn insert<T: ToJson>(@self, key: ~str, value: T) -> @JsonDictBuilder {
         self.dict.insert(key, value.to_json());
         self
     }
 
-    fn insert_list(self, key: ~str, f: fn(builder: &JsonListBuilder)) -> JsonDictBuilder {
+    fn insert_list(
+        @self,
+        key: ~str,
+        f: fn(builder: @JsonListBuilder)
+    ) -> @JsonDictBuilder {
         let builder = JsonListBuilder();
-        f(&*builder);
+        f(builder);
         self.insert(key, builder.consume())
     }
 
-    fn insert_dict(self, key: ~str, f: fn(builder: &JsonDictBuilder)) -> JsonDictBuilder {
+    fn insert_dict(
+        @self,
+        key: ~str,
+        f: fn(builder: @JsonDictBuilder)
+    ) -> @JsonDictBuilder {
         let builder = JsonDictBuilder();
         f(builder);
         self.insert(key, builder.dict)
@@ -886,7 +903,7 @@ pub struct Response {
 }
 
 pub mod response {
-    pub fn parse(msg: ~[u8]) -> Response {
+    pub fn parse(msg: &[u8]) -> Response {
         let end = msg.len();
 
         let (start, code) = parse_code(msg, end);
@@ -896,7 +913,7 @@ pub mod response {
         Response { code: code, status: status, body: body }
     }
 
-    fn parse_code(msg: ~[u8], end: uint) -> (uint, uint) {
+    fn parse_code(msg: &[u8], end: uint) -> (uint, uint) {
         match vec::position_between(msg, 0u, end, |c| c == '|' as u8) {
           None => fail ~"invalid response",
           Some(i) => {
@@ -908,14 +925,14 @@ pub mod response {
         }
     }
 
-    fn parse_status(msg: ~[u8], start: uint, end: uint) -> (uint, ~str) {
+    fn parse_status(msg: &[u8], start: uint, end: uint) -> (uint, ~str) {
         match vec::position_between(msg, start, end, |c| c == '|' as u8) {
           None => fail ~"invalid response",
           Some(i) => (i + 1u, str::from_bytes(vec::slice(msg, start, i))),
         }
     }
 
-    fn parse_body(msg: ~[u8], start: uint, end: uint) -> Json {
+    fn parse_body(msg: &[u8], start: uint, end: uint) -> Json {
         if start == end { return json::Null; }
 
         do io::with_bytes_reader(vec::view(msg, start, end)) |rdr| {
