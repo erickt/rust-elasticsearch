@@ -1,19 +1,18 @@
 #[link(name = "elasticsearch",
-       vers = "0.1pre",
+       vers = "0.1",
        uuid = "51a41dbe-d547-4804-8300-8a1b5d00d093")];
 #[crate_type = "lib"];
 
-use std;
-use zmq;
-use uri;
+extern mod std;
+extern mod zmq;
 
-import result::{ok, err};
-import dvec::{dvec, extensions};
-import std::json;
-import std::map;
-import std::map::{hashmap, str_hash};
-import std::json::json;
-import json::{to_json, to_str};
+use dvec::DVec;
+use std::json;
+use std::map;
+use std::map::HashMap;
+use std::json::Json;
+use std::net_url;
+use std::cell::Cell;
+use json::{ToJson, ToStr};
 
-import zmq::{context, socket, socket_util, to_str};
-import uri::encode_uri_component;
+use zmq::{Context, Socket, ToStr};
