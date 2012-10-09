@@ -11,7 +11,7 @@ export SearchType;
 export SearchBuilder;
 export DeleteBuilder;
 export DeleteByQueryBuilder;
-export JsonDictBuilder;
+export JsonObjectBuilder;
 export JsonListBuilder;
 export Response;
 
@@ -19,9 +19,9 @@ export Response;
 trait Transport {
     fn head(path: &str) -> Response;
     fn get(path: &str) -> Response;
-    fn put(path: &str, source: HashMap<~str, Json>) -> Response;
-    fn post(path: &str, source: HashMap<~str, Json>) -> Response;
-    fn delete(path: &str, source: Option<HashMap<~str, Json>>) -> Response;
+    fn put(path: &str, source: ~json::Object) -> Response;
+    fn post(path: &str, source: ~json::Object) -> Response;
+    fn delete(path: &str, source: Option<~json::Object>) -> Response;
     fn term();
 }
 
@@ -96,7 +96,7 @@ struct CreateIndexBuilder {
 
     mut timeout: Option<~str>,
 
-    mut source: Option<@HashMap<~str, Json>>,
+    mut source: Option<@~json::Object>,
 }
 
 fn CreateIndexBuilder(client: Client, +index: ~str) -> @CreateIndexBuilder {
@@ -115,7 +115,7 @@ impl CreateIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(@self, source: HashMap<~str, Json>) -> @CreateIndexBuilder {
+    fn set_source(@self, source: ~json::Object) -> @CreateIndexBuilder {
         self.source = Some(@source);
         self
     }
@@ -127,7 +127,7 @@ impl CreateIndexBuilder {
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.timeout {
           None => { },
-          Some(s) => vec::push(params, ~"timeout=" + s),
+          Some(s) => params.push(~"timeout=" + s),
         }
 
         if vec::is_not_empty(params) {
@@ -135,7 +135,7 @@ impl CreateIndexBuilder {
         }
 
         match copy self.source {
-          None => self.client.transport.put(path, map::HashMap()),
+          None => self.client.transport.put(path, ~LinearMap()),
           Some(source) => self.client.transport.put(path, *source),
         }
     }
@@ -176,7 +176,7 @@ impl DeleteIndexBuilder {
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.timeout {
           None => { },
-          Some(timeout) => vec::push(params, ~"timeout=" + timeout),
+          Some(timeout) => params.push(~"timeout=" + timeout),
         }
 
         if vec::is_not_empty(params) {
@@ -206,7 +206,7 @@ struct IndexBuilder {
     mut version: Option<uint>,
     mut version_type: VersionType,
 
-    mut source: Option<HashMap<~str, Json>>,
+    mut source: Option<~json::Object>,
 }
 
 fn IndexBuilder(client: Client, index: ~str, typ: ~str) -> @IndexBuilder {
@@ -286,7 +286,7 @@ impl IndexBuilder {
         self.version_type = version_type;
         self
     }
-    fn set_source(@self, source: HashMap<~str, Json>) -> @IndexBuilder {
+    fn set_source(@self, source: ~json::Object) -> @IndexBuilder {
         self.source = Some(source);
         self
     }
@@ -299,7 +299,7 @@ impl IndexBuilder {
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.id {
           None => { },
-          Some(id) => vec::push(path, net_url::encode_component(id)),
+          Some(id) => path.push(net_url::encode_component(id)),
         }
 
         let mut path = str::connect(path, "/");
@@ -307,65 +307,65 @@ impl IndexBuilder {
 
         match self.consistency {
             None => { },
-            Some(One) => vec::push(params, ~"consistency=one"),
-            Some(Quorum) => vec::push(params, ~"consistency=quorum"),
-            Some(All) => vec::push(params, ~"consistency=all"),
+            Some(One) => params.push(~"consistency=one"),
+            Some(Quorum) => params.push(~"consistency=quorum"),
+            Some(All) => params.push(~"consistency=all"),
         }
 
         match self.op_type {
-          CREATE => vec::push(params, ~"op_type=create"),
+          CREATE => params.push(~"op_type=create"),
           INDEX => { }
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.parent {
           None => { },
-          Some(s) => vec::push(params, ~"parent=" + s),
+          Some(s) => params.push(~"parent=" + s),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.percolate {
           None => { }
-          Some(s) =>  vec::push(params, ~"percolate=" + s),
+          Some(s) =>  params.push(~"percolate=" + s),
         }
 
-        if self.refresh { vec::push(params, ~"refresh=true"); }
+        if self.refresh { params.push(~"refresh=true"); }
 
         match self.replication {
           None => { },
-          Some(Sync) => vec::push(params, ~"replication=sync"),
-          Some(Async) => vec::push(params, ~"replication=async"),
+          Some(Sync) => params.push(~"replication=sync"),
+          Some(Async) => params.push(~"replication=async"),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.routing {
           None => { },
-          Some(s) => vec::push(params, ~"routing=" + s),
+          Some(s) => params.push(~"routing=" + s),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.timeout {
           None => { },
-          Some(s) => vec::push(params, ~"timeout=" + s),
+          Some(s) => params.push(~"timeout=" + s),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.timestamp {
           None => { },
-          Some(s) => vec::push(params, ~"timestamp=" + s),
+          Some(s) => params.push(~"timestamp=" + s),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.ttl {
           None => { },
-          Some(s) => vec::push(params, ~"ttl=" + s),
+          Some(s) => params.push(~"ttl=" + s),
         }
 
-        (copy self.version).iter(|i| vec::push(params, fmt!("version=%u", i)));
+        (copy self.version).iter(|i| params.push(fmt!("version=%u", *i)));
 
         match self.version_type {
           INTERNAL => { },
-          EXTERNAL => vec::push(params, ~"version_type=external"),
+          EXTERNAL => params.push(~"version_type=external"),
         }
 
         if vec::is_not_empty(params) {
@@ -373,7 +373,7 @@ impl IndexBuilder {
         }
 
         let source = match self.source {
-          None => map::HashMap(),
+          None => ~LinearMap(),
           Some(source) => source,
         };
 
@@ -404,7 +404,7 @@ struct SearchBuilder {
     mut search_type: Option<SearchType>,
     mut timeout: Option<~str>,
 
-    mut source: Option<HashMap<~str, Json>>
+    mut source: Option<~json::Object>
 }
 
 fn SearchBuilder(client: Client) -> @SearchBuilder {
@@ -452,7 +452,7 @@ impl SearchBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(@self, source: HashMap<~str, Json>) -> @SearchBuilder {
+    fn set_source(@self, source: ~json::Object) -> @SearchBuilder {
         self.source = Some(source);
         self
     }
@@ -467,9 +467,9 @@ impl SearchBuilder {
 
         let mut path = ~[];
 
-        vec::push(path, str::connect(indices, ","));
-        vec::push(path, str::connect(types, ","));
-        vec::push(path, ~"_search");
+        path.push(str::connect(indices, ","));
+        path.push(str::connect(types, ","));
+        path.push(~"_search");
 
         let mut path = str::connect(path, "/");
 
@@ -479,47 +479,47 @@ impl SearchBuilder {
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.preference {
           None => { },
-          Some(s) => vec::push(params, ~"preference=" + s),
+          Some(s) => params.push(~"preference=" + s),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.routing {
           None => { },
-          Some(s) => vec::push(params, ~"routing=" + s),
+          Some(s) => params.push(~"routing=" + s),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.scroll {
           None => { },
-          Some(s) => vec::push(params, ~"scroll=" + s),
+          Some(s) => params.push(~"scroll=" + s),
         }
 
         match self.search_type {
             None => { },
             Some(DfsQueryThenFetch) =>
-                vec::push(params, ~"search_type=dfs_query_then_fetch"),
+                params.push(~"search_type=dfs_query_then_fetch"),
             Some(QueryThenFetch) =>
-                vec::push(params, ~"search_type=query_then_fetch"),
+                params.push(~"search_type=query_then_fetch"),
             Some(DfsQueryAndFetch) =>
-                vec::push(params, ~"search_type=dfs_query_and_fetch"),
+                params.push(~"search_type=dfs_query_and_fetch"),
             Some(QueryAndFetch) =>
-                vec::push(params, ~"search_type=query_and_fetch"),
-            Some(Scan) => vec::push(params, ~"search_type=scan"),
-            Some(Count) => vec::push(params, ~"search_type=count"),
+                params.push(~"search_type=query_and_fetch"),
+            Some(Scan) => params.push(~"search_type=scan"),
+            Some(Count) => params.push(~"search_type=count"),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.timeout {
           None => { }
-          Some(s) => vec::push(params, ~"timeout=" + s),
+          Some(s) => params.push(~"timeout=" + s),
         }
 
         if vec::is_not_empty(params) {
             path += ~"?" + str::connect(params, "&");
         }
 
-        let source : HashMap<~str, Json> = match self.source {
-          None => map::HashMap(),
+        let source = match self.source {
+          None => ~LinearMap(),
           Some(source) => source,
         };
 
@@ -609,36 +609,36 @@ impl DeleteBuilder {
 
         match self.consistency {
             None => { },
-            Some(One) => vec::push(params, ~"consistency=one"),
-            Some(Quorum) => vec::push(params, ~"consistency=quorum"),
-            Some(All) => vec::push(params, ~"consistency=all"),
+            Some(One) => params.push(~"consistency=one"),
+            Some(Quorum) => params.push(~"consistency=quorum"),
+            Some(All) => params.push(~"consistency=all"),
         }
 
-        if self.refresh { vec::push(params, ~"refresh=true"); }
+        if self.refresh { params.push(~"refresh=true"); }
 
         match self.replication {
           None => { }
-          Some(Sync) => vec::push(params, ~"replication=sync"),
-          Some(Async) => vec::push(params, ~"replication=async"),
+          Some(Sync) => params.push(~"replication=sync"),
+          Some(Async) => params.push(~"replication=async"),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.routing {
           None => { }
-          Some(s) => vec::push(params, ~"routing=" + s),
+          Some(s) => params.push(~"routing=" + s),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.timeout {
           None => { }
-          Some(s) => vec::push(params, ~"timeout=" + s),
+          Some(s) => params.push(~"timeout=" + s),
         }
 
-        (copy self.version).iter(|i| vec::push(params, fmt!("version=%u", i)));
+        (copy self.version).iter(|i| params.push(fmt!("version=%u", *i)));
 
         match self.version_type {
           INTERNAL => { }
-          EXTERNAL => vec::push(params, ~"version_type=external"),
+          EXTERNAL => params.push(~"version_type=external"),
         }
 
         if vec::is_not_empty(params) {
@@ -660,7 +660,7 @@ struct DeleteByQueryBuilder {
     mut routing: Option<~str>,
     mut timeout: Option<~str>,
 
-    mut source: Option<HashMap<~str, Json>>,
+    mut source: Option<~json::Object>,
 }
 
 fn DeleteByQueryBuilder(client: Client) -> @DeleteByQueryBuilder {
@@ -716,7 +716,7 @@ impl DeleteByQueryBuilder {
     }
     fn set_source(
         @self,
-        source: HashMap<~str, Json>
+        source: ~json::Object
     ) -> @DeleteByQueryBuilder {
         self.source = Some(source);
         self
@@ -725,9 +725,9 @@ impl DeleteByQueryBuilder {
     fn execute() -> Response {
         let mut path = ~[];
 
-        vec::push(path, str::connect(self.indices, ","));
-        vec::push(path, str::connect(self.types, ","));
-        vec::push(path, ~"_query");
+        path.push(str::connect(self.indices, ","));
+        path.push(str::connect(self.types, ","));
+        path.push(~"_query");
 
         let mut path = str::connect(path, "/");
 
@@ -736,27 +736,27 @@ impl DeleteByQueryBuilder {
 
         match self.consistency {
             None => {}
-            Some(One) => vec::push(params, ~"consistency=one"),
-            Some(Quorum) => vec::push(params, ~"consistency=quorum"),
-            Some(All) => vec::push(params, ~"consistency=all"),
+            Some(One) => params.push(~"consistency=one"),
+            Some(Quorum) => params.push(~"consistency=quorum"),
+            Some(All) => params.push(~"consistency=all"),
         }
 
-        if self.refresh { vec::push(params, ~"refresh=true"); }
+        if self.refresh { params.push(~"refresh=true"); }
 
         match self.replication {
           None => { }
-          Some(Sync)  => vec::push(params, ~"replication=sync"),
-          Some(Async) => vec::push(params, ~"replication=async"),
+          Some(Sync)  => params.push(~"replication=sync"),
+          Some(Async) => params.push(~"replication=async"),
         }
 
         match copy self.routing {
           None => { }
-          Some(routing) => vec::push(params, ~"routing=" + routing),
+          Some(routing) => params.push(~"routing=" + routing),
         }
 
         match copy self.timeout {
           None => { }
-          Some(timeout) => vec::push(params, ~"timeout=" + timeout),
+          Some(timeout) => params.push(~"timeout=" + timeout),
         }
 
         if vec::is_not_empty(params) {
@@ -793,22 +793,27 @@ pub impl JsonListBuilder {
         self.push(builder.consume())
     }
 
-    fn push_dict(@self, f: fn(builder: @JsonDictBuilder)) -> @JsonListBuilder {
-        let builder = JsonDictBuilder();
+    fn push_object(
+        @self,
+        f: fn(builder: @JsonObjectBuilder)
+    ) -> @JsonListBuilder {
+        let builder = JsonObjectBuilder();
         f(builder);
-        self.push(builder.dict)
+        self.push(json::Object(builder.object.take()))
     }
 }
 
-pub struct JsonDictBuilder { dict: HashMap<~str, Json> }
+pub struct JsonObjectBuilder { object: Cell<~json::Object> }
 
-pub fn JsonDictBuilder() -> @JsonDictBuilder {
-    @JsonDictBuilder { dict: HashMap() }
+pub fn JsonObjectBuilder() -> @JsonObjectBuilder {
+    @JsonObjectBuilder { object: Cell(~LinearMap()) }
 }
 
-pub impl JsonDictBuilder {
-    fn insert<T: ToJson>(@self, key: ~str, value: T) -> @JsonDictBuilder {
-        self.dict.insert(key, value.to_json());
+pub impl JsonObjectBuilder {
+    fn insert<T: ToJson>(@self, key: ~str, value: T) -> @JsonObjectBuilder {
+        let mut object = self.object.take();
+        object.insert(key, value.to_json());
+        self.object.put_back(object);
         self
     }
 
@@ -816,20 +821,20 @@ pub impl JsonDictBuilder {
         @self,
         key: ~str,
         f: fn(builder: @JsonListBuilder)
-    ) -> @JsonDictBuilder {
+    ) -> @JsonObjectBuilder {
         let builder = JsonListBuilder();
         f(builder);
         self.insert(key, builder.consume())
     }
 
-    fn insert_dict(
+    fn insert_object(
         @self,
         key: ~str,
-        f: fn(builder: @JsonDictBuilder)
-    ) -> @JsonDictBuilder {
-        let builder = JsonDictBuilder();
+        f: fn(builder: @JsonObjectBuilder)
+    ) -> @JsonObjectBuilder {
+        let builder = JsonObjectBuilder();
         f(builder);
-        self.insert(key, builder.dict)
+        self.insert(key, json::Object(builder.object.take()))
     }
 }
 
@@ -840,17 +845,17 @@ pub struct ZMQTransport { socket: zmq::Socket }
 pub impl ZMQTransport: Transport {
     fn head(path: &str) -> Response { self.send(fmt!("HEAD|%s", path)) }
     fn get(path: &str) -> Response { self.send(fmt!("GET|%s", path)) }
-    fn put(path: &str, source: HashMap<~str, Json>) -> Response {
-        self.send(fmt!("PUT|%s|%s", path, json::Dict(source).to_str()))
+    fn put(path: &str, source: ~json::Object) -> Response {
+        self.send(fmt!("PUT|%s|%s", path, json::Object(source).to_str()))
     }
-    fn post(path: &str, source: HashMap<~str, Json>) -> Response {
-        self.send(fmt!("POST|%s|%s", path, json::Dict(source).to_str()))
+    fn post(path: &str, source: ~json::Object) -> Response {
+        self.send(fmt!("POST|%s|%s", path, json::Object(source).to_str()))
     }
-    fn delete(path: &str, source: Option<HashMap<~str, Json>>) -> Response {
+    fn delete(path: &str, source: Option<~json::Object>) -> Response {
         match source {
           None => self.send(fmt!("DELETE|%s", path)),
           Some(source) =>
-            self.send(fmt!("DELETE|%s|%s", path, json::Dict(source).to_str())),
+            self.send(fmt!("DELETE|%s|%s", path, json::Object(source).to_str())),
         }
     }
 
@@ -914,7 +919,7 @@ pub mod response {
     }
 
     fn parse_code(msg: &[u8], end: uint) -> (uint, uint) {
-        match vec::position_between(msg, 0u, end, |c| c == '|' as u8) {
+        match vec::position_between(msg, 0u, end, |c| *c == '|' as u8) {
           None => fail ~"invalid response",
           Some(i) => {
             match uint::parse_bytes(vec::slice(msg, 0u, i), 10u) {
@@ -926,7 +931,7 @@ pub mod response {
     }
 
     fn parse_status(msg: &[u8], start: uint, end: uint) -> (uint, ~str) {
-        match vec::position_between(msg, start, end, |c| c == '|' as u8) {
+        match vec::position_between(msg, start, end, |c| *c == '|' as u8) {
           None => fail ~"invalid response",
           Some(i) => (i + 1u, str::from_bytes(vec::slice(msg, start, i))),
         }

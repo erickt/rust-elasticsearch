@@ -2,7 +2,7 @@ extern mod std;
 extern mod zmq;
 extern mod elasticsearch;
 
-use elasticsearch::{JsonListBuilder, JsonDictBuilder};
+use elasticsearch::{JsonListBuilder, JsonObjectBuilder};
 
 fn main() {
     let ctx = match zmq::init(1) {
@@ -15,12 +15,12 @@ fn main() {
     io::println(fmt!("%?\n", client.transport.get("/")));
 
     io::println(fmt!("%?\n", client.prepare_create_index(~"test")
-        .set_source(JsonDictBuilder()
-            .insert_dict(~"settings", |bld| {
+        .set_source(JsonObjectBuilder()
+            .insert_object(~"settings", |bld| {
                 bld.insert(~"index.number_of_shards", 1u)
                    .insert(~"index.number_of_replicas", 0u);
             })
-            .dict
+            .object.take()
       )
       .execute()));
 
@@ -29,12 +29,12 @@ fn main() {
     io::println(fmt!("%?\n", client.prepare_index(~"test", ~"test")
       .set_id(~"1")
       .set_version(2u)
-      .set_source(JsonDictBuilder()
+      .set_source(JsonObjectBuilder()
           .insert(~"foo", 5.0)
           .insert(~"bar", ~"wee")
-          .insert_dict(~"baz", |bld| { bld.insert(~"a", 2.0); })
+          .insert_object(~"baz", |bld| { bld.insert(~"a", 2.0); })
           .insert_list(~"boo", |bld| { bld.push(~"aaa").push(~"zzz"); })
-          .dict
+          .object.take()
       )
       .set_refresh(true)
       .execute()));
@@ -43,9 +43,9 @@ fn main() {
 
     io::println(fmt!("%?\n", client.prepare_search()
       .set_indices(~[~"test"])
-      .set_source(JsonDictBuilder()
+      .set_source(JsonObjectBuilder()
           .insert(~"fields", ~[~"foo", ~"bar"])
-          .dict
+          .object.take()
       )
       .execute()));
 
@@ -53,18 +53,18 @@ fn main() {
 
     io::println(fmt!("%?\n", client.prepare_index(~"test", ~"test")
       .set_id(~"2")
-      .set_source(JsonDictBuilder()
+      .set_source(JsonObjectBuilder()
           .insert(~"bar", ~"lala")
-          .dict
+          .object.take()
       )
       .set_refresh(true)
       .execute()));
 
     io::println(fmt!("%?\n", client.prepare_delete_by_query()
       .set_indices(~[~"test"])
-      .set_source(JsonDictBuilder()
-          .insert_dict(~"term", |bld| { bld.insert(~"bar", ~"lala"); })
-          .dict
+      .set_source(JsonObjectBuilder()
+          .insert_object(~"term", |bld| { bld.insert(~"bar", ~"lala"); })
+          .object.take()
       )
       .execute()));
 

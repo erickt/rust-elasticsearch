@@ -7,6 +7,7 @@ extern mod std;
 extern mod zmq;
 
 use dvec::DVec;
+use send_map::linear::LinearMap;
 use std::json;
 use std::map;
 use std::map::HashMap;
