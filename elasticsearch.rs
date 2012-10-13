@@ -47,9 +47,9 @@ impl Client {
     #[doc = "Get a specific document"]
     fn get(index: &str, typ: &str, id: &str) -> Response {
         let path = str::connect(~[
-            net_url::encode_component(index),
-            net_url::encode_component(typ),
-            net_url::encode_component(id)
+            url::encode_component(index),
+            url::encode_component(typ),
+            url::encode_component(id)
         ], "/");
         self.transport.get(path)
     }
@@ -120,7 +120,7 @@ impl CreateIndexBuilder {
         self
     }
     fn execute() -> Response {
-        let mut path = net_url::encode_component(self.index);
+        let mut path = url::encode_component(self.index);
 
         let mut params = ~[];
 
@@ -166,7 +166,7 @@ impl DeleteIndexBuilder {
     }
     fn execute() -> Response {
         let indices = do (copy self.indices).map |i| {
-            net_url::encode_component(*i)
+            url::encode_component(*i)
         };
         let mut path = str::connect(indices, ",");
 
@@ -292,14 +292,14 @@ impl IndexBuilder {
     }
     fn execute() -> Response {
         let mut path = ~[
-            net_url::encode_component(self.index),
-            net_url::encode_component(self.typ)
+            url::encode_component(self.index),
+            url::encode_component(self.typ)
         ];
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match copy self.id {
           None => { },
-          Some(id) => path.push(net_url::encode_component(id)),
+          Some(id) => path.push(url::encode_component(id)),
         }
 
         let mut path = str::connect(path, "/");
@@ -458,11 +458,11 @@ impl SearchBuilder {
     }
     fn execute() -> Response {
         let indices = do (copy self.indices).map |i| {
-            net_url::encode_component(*i)
+            url::encode_component(*i)
         };
 
         let types = do (copy self.types).map |t| {
-            net_url::encode_component(*t)
+            url::encode_component(*t)
         };
 
         let mut path = ~[];
@@ -599,9 +599,9 @@ impl DeleteBuilder {
     }
     fn execute() -> Response {
         let mut path = str::connect(~[
-            net_url::encode_component(self.index),
-            net_url::encode_component(self.typ),
-            net_url::encode_component(self.id)
+            url::encode_component(self.index),
+            url::encode_component(self.typ),
+            url::encode_component(self.id)
         ], "/");
 
         // Build the query parameters.

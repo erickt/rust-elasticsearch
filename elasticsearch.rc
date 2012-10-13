@@ -12,7 +12,7 @@ use std::json;
 use std::map;
 use std::map::HashMap;
 use std::json::Json;
-use std::net_url;
+use std::net::url;
 use std::cell::Cell;
 use json::{ToJson, ToStr};
 
