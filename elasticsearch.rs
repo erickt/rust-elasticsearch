@@ -55,7 +55,7 @@ impl Client {
     }
 
     #[doc = "Create an index builder that will create documents"]
-    fn prepare_index(+index: ~str, +typ: ~str) -> @IndexBuilder {
+    fn prepare_index(index: ~str, typ: ~str) -> @IndexBuilder {
         IndexBuilder(self, index, typ)
     }
 
@@ -70,7 +70,7 @@ impl Client {
     }
 
     #[doc = "Delete a document"]
-    fn prepare_delete(+index: ~str, +typ: ~str, +id: ~str) -> @DeleteBuilder {
+    fn prepare_delete(index: ~str, typ: ~str, id: ~str) -> @DeleteBuilder {
         DeleteBuilder(self, index, typ, id)
     }
 
@@ -96,10 +96,10 @@ struct CreateIndexBuilder {
 
     mut timeout: Option<~str>,
 
-    mut source: Option<@~json::Object>,
+    mut source: Option<~json::Object>,
 }
 
-fn CreateIndexBuilder(client: Client, +index: ~str) -> @CreateIndexBuilder {
+fn CreateIndexBuilder(client: Client, index: ~str) -> @CreateIndexBuilder {
     @CreateIndexBuilder {
         client: client,
         index: index,
@@ -111,12 +111,12 @@ fn CreateIndexBuilder(client: Client, +index: ~str) -> @CreateIndexBuilder {
 }
 
 impl CreateIndexBuilder {
-    fn set_timeout(@self, +timeout: ~str) -> @CreateIndexBuilder {
+    fn set_timeout(@self, timeout: ~str) -> @CreateIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
     fn set_source(@self, source: ~json::Object) -> @CreateIndexBuilder {
-        self.source = Some(@source);
+        self.source = Some(source);
         self
     }
     fn execute() -> Response {
@@ -134,9 +134,12 @@ impl CreateIndexBuilder {
             path += ~"?" + str::connect(params, "&");
         }
 
-        match copy self.source {
+        let mut source = None;
+        source <-> self.source;
+
+        match move source {
           None => self.client.transport.put(path, ~LinearMap()),
-          Some(source) => self.client.transport.put(path, *source),
+          Some(move source) => self.client.transport.put(path, source),
         }
     }
 }
@@ -156,11 +159,11 @@ fn DeleteIndexBuilder(client: Client) -> @DeleteIndexBuilder {
 }
 
 impl DeleteIndexBuilder {
-    fn set_indices(@self, +indices: ~[~str]) -> @DeleteIndexBuilder {
+    fn set_indices(@self, indices: ~[~str]) -> @DeleteIndexBuilder {
         self.indices = indices;
         self
     }
-    fn set_timeout(@self, +timeout: ~str) -> @DeleteIndexBuilder {
+    fn set_timeout(@self, timeout: ~str) -> @DeleteIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
@@ -372,9 +375,12 @@ impl IndexBuilder {
             path += ~"?" + str::connect(params, "&");
         }
 
-        let source = match self.source {
+        let mut source = None;
+        source <-> self.source;
+
+        let source = match move source {
           None => ~LinearMap(),
-          Some(source) => source,
+          Some(move source) => source,
         };
 
         match self.id {
@@ -518,9 +524,12 @@ impl SearchBuilder {
             path += ~"?" + str::connect(params, "&");
         }
 
-        let source = match self.source {
+        let mut source = None;
+        source <-> self.source;
+
+        let source = match move source {
           None => ~LinearMap(),
-          Some(source) => source,
+          Some(move source) => source,
         };
 
         self.client.transport.post(path, source)
@@ -544,9 +553,9 @@ struct DeleteBuilder {
 
 fn DeleteBuilder(
     client: Client,
-    +index: ~str,
-    +typ: ~str,
-    +id: ~str
+    index: ~str,
+    typ: ~str,
+    id: ~str
 ) -> @DeleteBuilder {
     @DeleteBuilder {
         client: client,
@@ -852,10 +861,12 @@ pub impl ZMQTransport: Transport {
         self.send(fmt!("POST|%s|%s", path, json::Object(source).to_str()))
     }
     fn delete(path: &str, source: Option<~json::Object>) -> Response {
-        match source {
-          None => self.send(fmt!("DELETE|%s", path)),
-          Some(source) =>
-            self.send(fmt!("DELETE|%s|%s", path, json::Object(source).to_str())),
+        match move source {
+            None => self.send(fmt!("DELETE|%s", path)),
+            Some(move source) =>
+                self.send(fmt!("DELETE|%s|%s",
+                    path,
+                    json::Object(source).to_str())),
         }
     }
 
@@ -942,7 +953,7 @@ pub mod response {
 
         do io::with_bytes_reader(vec::view(msg, start, end)) |rdr| {
             match json::from_reader(rdr) {
-              Ok(json) => json,
+              Ok(move json) => json,
               Err(e) => fail e.to_str(),
             }
         }
