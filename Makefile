@@ -9,6 +9,7 @@ example: all
 
 deps:
 	cargo install zmq
+	cargo install url
 
 clean:
 	rm -rf elasticsearch *.so *.dylib *.dSYM

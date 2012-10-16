@@ -5,6 +5,7 @@
 
 extern mod std;
 extern mod zmq;
+extern mod url;
 
 use dvec::DVec;
 use send_map::linear::LinearMap;
@@ -12,7 +13,6 @@ use std::json;
 use std::map;
 use std::map::HashMap;
 use std::json::Json;
-use std::net::url;
 use std::cell::Cell;
 use json::{ToJson, ToStr};
 
