@@ -20,7 +20,7 @@ fn main() {
                 bld.insert(~"index.number_of_shards", 1u)
                    .insert(~"index.number_of_replicas", 0u);
             })
-            .object.take()
+            .consume()
       )
       .execute()));
 
@@ -34,7 +34,7 @@ fn main() {
           .insert(~"bar", ~"wee")
           .insert_object(~"baz", |bld| { bld.insert(~"a", 2.0); })
           .insert_list(~"boo", |bld| { bld.push(~"aaa").push(~"zzz"); })
-          .object.take()
+          .consume()
       )
       .set_refresh(true)
       .execute()));
@@ -45,7 +45,7 @@ fn main() {
       .set_indices(~[~"test"])
       .set_source(JsonObjectBuilder::new()
           .insert(~"fields", ~[~"foo", ~"bar"])
-          .object.take()
+          .consume()
       )
       .execute()));
 
@@ -55,7 +55,7 @@ fn main() {
       .set_id(~"2")
       .set_source(JsonObjectBuilder::new()
           .insert(~"bar", ~"lala")
-          .object.take()
+          .consume()
       )
       .set_refresh(true)
       .execute()));
@@ -64,7 +64,7 @@ fn main() {
       .set_indices(~[~"test"])
       .set_source(JsonObjectBuilder::new()
           .insert_object(~"term", |bld| { bld.insert(~"bar", ~"lala"); })
-          .object.take()
+          .consume()
       )
       .execute()));
 

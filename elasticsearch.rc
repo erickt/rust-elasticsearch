@@ -781,73 +781,76 @@ impl DeleteByQueryBuilder {
 }
 
 pub struct JsonListBuilder {
-    list: Cell<DVec<Json>>
-}
-
-priv impl JsonListBuilder {
-    fn consume() -> ~[Json] {
-        dvec::unwrap(self.list.take())
-    }
+    mut list: ~[Json]
 }
 
 pub impl JsonListBuilder {
-    static fn new() -> @JsonListBuilder {
-        @JsonListBuilder { list: Cell(DVec()) }
+    static fn new() -> JsonListBuilder {
+        JsonListBuilder { list: ~[] }
     }
 
-    fn push<T: ToJson>(@self, value: T) -> @JsonListBuilder {
-        self.list.with_ref(|list| list.push(value.to_json()));
+    fn consume(self) -> ~[Json] {
+        let JsonListBuilder { list } = self;
+        list
+    }
+
+    fn push<T: ToJson>(self, value: T) -> JsonListBuilder {
+        self.list.push(value.to_json());
         self
     }
 
-    fn push_list(@self, f: fn(builder: @JsonListBuilder)) -> @JsonListBuilder {
+    fn push_list(self, f: fn(&JsonListBuilder)) -> JsonListBuilder {
         let builder = JsonListBuilder::new();
-        f(builder);
+        f(&builder);
         self.push(builder.consume())
     }
 
     fn push_object(
-        @self,
-        f: fn(builder: @JsonObjectBuilder)
-    ) -> @JsonListBuilder {
+        self,
+        f: fn(&JsonObjectBuilder)
+    ) -> JsonListBuilder {
         let builder = JsonObjectBuilder::new();
-        f(builder);
-        self.push(json::Object(builder.object.take()))
+        f(&builder);
+        self.push(json::Object(builder.consume()))
     }
 }
 
-pub struct JsonObjectBuilder { object: Cell<~json::Object> }
+pub struct JsonObjectBuilder {
+    object: ~json::Object
+}
 
 pub impl JsonObjectBuilder {
-    static fn new() -> @JsonObjectBuilder {
-        @JsonObjectBuilder { object: Cell(~LinearMap()) }
+    static fn new() -> JsonObjectBuilder {
+        JsonObjectBuilder { object: ~LinearMap() }
     }
 
-    fn insert<T: ToJson>(@self, key: ~str, value: T) -> @JsonObjectBuilder {
-        let mut object = self.object.take();
+    fn consume(self) -> ~json::Object {
+        let JsonObjectBuilder { object } = self;
+        object
+    }
+
+    fn insert<T: ToJson>(self, key: ~str, value: T) -> JsonObjectBuilder {
+        let mut object = self.consume();
         object.insert(key, value.to_json());
-        self.object.put_back(object);
-        self
+        JsonObjectBuilder { object: object }
     }
 
-    fn insert_list(
-        @self,
+    fn insert_list(self,
         key: ~str,
-        f: fn(builder: @JsonListBuilder)
-    ) -> @JsonObjectBuilder {
+        f: fn(&JsonListBuilder)
+    ) -> JsonObjectBuilder {
         let builder = JsonListBuilder::new();
-        f(builder);
+        f(&builder);
         self.insert(key, builder.consume())
     }
 
-    fn insert_object(
-        @self,
+    fn insert_object(self,
         key: ~str,
-        f: fn(builder: @JsonObjectBuilder)
-    ) -> @JsonObjectBuilder {
+        f: fn(&JsonObjectBuilder)
+    ) -> JsonObjectBuilder {
         let builder = JsonObjectBuilder::new();
-        f(builder);
-        self.insert(key, json::Object(builder.object.take()))
+        f(&builder);
+        self.insert(key, json::Object(builder.consume()))
     }
 }
 
