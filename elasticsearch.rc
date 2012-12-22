@@ -73,7 +73,11 @@ pub impl Client {
     }
 
     /// Delete a document
-    fn prepare_delete(index: ~str, typ: ~str, id: ~str) -> DeleteBuilder {
+    fn prepare_delete(
+        index: ~str,
+        typ: ~str,
+        id: ~str
+    ) -> DeleteBuilder {
         DeleteBuilder::new(self, index, typ, id)
     }
 
@@ -96,9 +100,7 @@ pub enum VersionType { INTERNAL, EXTERNAL }
 pub struct CreateIndexBuilder {
     client: Client,
     index: ~str,
-
     mut timeout: Option<~str>,
-
     mut source: Option<~json::Object>,
 }
 
@@ -107,9 +109,7 @@ pub impl CreateIndexBuilder {
         CreateIndexBuilder {
             client: client,
             index: index,
-
             mut timeout: None,
-
             mut source: None,
         }
     }
@@ -127,10 +127,9 @@ pub impl CreateIndexBuilder {
 
         let mut params = ~[];
 
-        // FIXME: https://github.com/mozilla/rust/issues/2549
-        match copy self.timeout {
+        match self.timeout {
           None => { },
-          Some(s) => params.push(~"timeout=" + s),
+          Some(copy s) => params.push(~"timeout=" + s),
         }
 
         if vec::is_not_empty(params) {
@@ -179,10 +178,9 @@ pub impl DeleteIndexBuilder {
         // Build the query parameters.
         let mut params = ~[];
 
-        // FIXME: https://github.com/mozilla/rust/issues/2549
-        match copy self.timeout {
+        match self.timeout {
           None => { },
-          Some(timeout) => params.push(~"timeout=" + timeout),
+          Some(copy timeout) => params.push(~"timeout=" + timeout),
         }
 
         if vec::is_not_empty(params) {
