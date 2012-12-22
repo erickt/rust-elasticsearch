@@ -38,12 +38,12 @@ pub impl Client {
     }
 
     /// Create an index
-    fn prepare_create_index(index: ~str) -> @CreateIndexBuilder {
+    fn prepare_create_index(index: ~str) -> CreateIndexBuilder {
         CreateIndexBuilder::new(self, index)
     }
 
     /// Delete indices
-    fn prepare_delete_index() -> @DeleteIndexBuilder {
+    fn prepare_delete_index() -> DeleteIndexBuilder {
         DeleteIndexBuilder::new(self)
     }
 
@@ -58,12 +58,12 @@ pub impl Client {
     }
 
     /// Create an index builder that will create documents
-    fn prepare_index(index: ~str, typ: ~str) -> @IndexBuilder {
+    fn prepare_index(index: ~str, typ: ~str) -> IndexBuilder {
         IndexBuilder::new(self, index, typ)
     }
 
     /// Create a search builder that will query elasticsearch
-    fn prepare_search() -> @SearchBuilder {
+    fn prepare_search() -> SearchBuilder {
         SearchBuilder::new(self)
     }
 
@@ -73,12 +73,12 @@ pub impl Client {
     }
 
     /// Delete a document
-    fn prepare_delete(index: ~str, typ: ~str, id: ~str) -> @DeleteBuilder {
+    fn prepare_delete(index: ~str, typ: ~str, id: ~str) -> DeleteBuilder {
         DeleteBuilder::new(self, index, typ, id)
     }
 
     /// Create a search builder that will query elasticsearch
-    fn prepare_delete_by_query() -> @DeleteByQueryBuilder {
+    fn prepare_delete_by_query() -> DeleteByQueryBuilder {
         DeleteByQueryBuilder::new(self)
     }
 
@@ -103,8 +103,8 @@ pub struct CreateIndexBuilder {
 }
 
 pub impl CreateIndexBuilder {
-    static fn new(client: Client, index: ~str) -> @CreateIndexBuilder {
-        @CreateIndexBuilder {
+    static fn new(client: Client, index: ~str) -> CreateIndexBuilder {
+        CreateIndexBuilder {
             client: client,
             index: index,
 
@@ -114,11 +114,11 @@ pub impl CreateIndexBuilder {
         }
     }
 
-    fn set_timeout(@self, timeout: ~str) -> @CreateIndexBuilder {
+    fn set_timeout(self, timeout: ~str) -> CreateIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(@self, source: ~json::Object) -> @CreateIndexBuilder {
+    fn set_source(self, source: ~json::Object) -> CreateIndexBuilder {
         self.source = Some(source);
         self
     }
@@ -154,19 +154,19 @@ pub struct DeleteIndexBuilder {
 }
 
 pub impl DeleteIndexBuilder {
-    static fn new(client: Client) -> @DeleteIndexBuilder {
-        @DeleteIndexBuilder {
+    static fn new(client: Client) -> DeleteIndexBuilder {
+        DeleteIndexBuilder {
             client: client,
             mut indices: ~[],
             mut timeout: None,
         }
     }
 
-    fn set_indices(@self, indices: ~[~str]) -> @DeleteIndexBuilder {
+    fn set_indices(self, indices: ~[~str]) -> DeleteIndexBuilder {
         self.indices = indices;
         self
     }
-    fn set_timeout(@self, timeout: ~str) -> @DeleteIndexBuilder {
+    fn set_timeout(self, timeout: ~str) -> DeleteIndexBuilder {
         self.timeout = Some(timeout);
         self
     }
@@ -217,8 +217,8 @@ pub struct IndexBuilder {
 
 
 pub impl IndexBuilder {
-    static fn new(client: Client, index: ~str, typ: ~str) -> @IndexBuilder {
-        @IndexBuilder {
+    static fn new(client: Client, index: ~str, typ: ~str) -> IndexBuilder {
+        IndexBuilder {
             client: client,
             index: index,
             typ: typ,
@@ -241,59 +241,59 @@ pub impl IndexBuilder {
         }
     }
 
-    fn set_id(@self, id: ~str) -> @IndexBuilder {
+    fn set_id(self, id: ~str) -> IndexBuilder {
         self.id = Some(id);
         self
     }
-    fn set_consistency(@self, consistency: Consistency) -> @IndexBuilder {
+    fn set_consistency(self, consistency: Consistency) -> IndexBuilder {
         self.consistency = Some(consistency);
         self
     }
-    fn set_op_type(@self, op_type: OpType) -> @IndexBuilder {
+    fn set_op_type(self, op_type: OpType) -> IndexBuilder {
         self.op_type = op_type;
         self
     }
-    fn set_parent(@self, parent: ~str) -> @IndexBuilder {
+    fn set_parent(self, parent: ~str) -> IndexBuilder {
         self.parent = Some(parent);
         self
     }
-    fn set_percolate(@self, percolate: ~str) -> @IndexBuilder {
+    fn set_percolate(self, percolate: ~str) -> IndexBuilder {
         self.percolate = Some(percolate);
         self
     }
-    fn set_refresh(@self, refresh: bool) -> @IndexBuilder {
+    fn set_refresh(self, refresh: bool) -> IndexBuilder {
         self.refresh = refresh;
         self
     }
-    fn set_replication(@self, replication: Replication) -> @IndexBuilder {
+    fn set_replication(self, replication: Replication) -> IndexBuilder {
         self.replication = Some(replication);
         self
     }
-    fn set_routing(@self, routing: ~str) -> @IndexBuilder {
+    fn set_routing(self, routing: ~str) -> IndexBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(@self, timeout: ~str) -> @IndexBuilder {
+    fn set_timeout(self, timeout: ~str) -> IndexBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_timestamp(@self, timestamp: ~str) -> @IndexBuilder {
+    fn set_timestamp(self, timestamp: ~str) -> IndexBuilder {
         self.timestamp = Some(timestamp);
         self
     }
-    fn set_ttl(@self, ttl: ~str) -> @IndexBuilder {
+    fn set_ttl(self, ttl: ~str) -> IndexBuilder {
         self.ttl = Some(ttl);
         self
     }
-    fn set_version(@self, version: uint) -> @IndexBuilder {
+    fn set_version(self, version: uint) -> IndexBuilder {
         self.version = Some(version);
         self
     }
-    fn set_version_type(@self, version_type: VersionType) -> @IndexBuilder {
+    fn set_version_type(self, version_type: VersionType) -> IndexBuilder {
         self.version_type = version_type;
         self
     }
-    fn set_source(@self, source: ~json::Object) -> @IndexBuilder {
+    fn set_source(self, source: ~json::Object) -> IndexBuilder {
         self.source = Some(source);
         self
     }
@@ -418,8 +418,8 @@ pub struct SearchBuilder {
 }
 
 pub impl SearchBuilder {
-    static fn new(client: Client) -> @SearchBuilder {
-        @SearchBuilder {
+    static fn new(client: Client) -> SearchBuilder {
+        SearchBuilder {
             client: client,
             mut indices: ~[],
             mut types: ~[],
@@ -434,35 +434,35 @@ pub impl SearchBuilder {
         }
     }
 
-    fn set_indices(@self, indices: ~[~str]) -> @SearchBuilder {
+    fn set_indices(self, indices: ~[~str]) -> SearchBuilder {
         self.indices = indices;
         self
     }
-    fn set_types(@self, types: ~[~str]) -> @SearchBuilder {
+    fn set_types(self, types: ~[~str]) -> SearchBuilder {
         self.types = types;
         self
     }
-    fn set_preference(@self, preference: ~str) -> @SearchBuilder {
+    fn set_preference(self, preference: ~str) -> SearchBuilder {
         self.preference = Some(preference);
         self
     }
-    fn set_routing(@self, routing: ~str) -> @SearchBuilder {
+    fn set_routing(self, routing: ~str) -> SearchBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_scroll(@self, scroll: ~str) -> @SearchBuilder {
+    fn set_scroll(self, scroll: ~str) -> SearchBuilder {
         self.scroll = Some(scroll);
         self
     }
-    fn set_search_type(@self, search_type: SearchType) -> @SearchBuilder {
+    fn set_search_type(self, search_type: SearchType) -> SearchBuilder {
         self.search_type = Some(search_type);
         self
     }
-    fn set_timeout(@self, timeout: ~str) -> @SearchBuilder {
+    fn set_timeout(self, timeout: ~str) -> SearchBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_source(@self, source: ~json::Object) -> @SearchBuilder {
+    fn set_source(self, source: ~json::Object) -> SearchBuilder {
         self.source = Some(source);
         self
     }
@@ -561,8 +561,8 @@ impl DeleteBuilder {
         index: ~str,
         typ: ~str,
         id: ~str
-    ) -> @DeleteBuilder {
-        @DeleteBuilder {
+    ) -> DeleteBuilder {
+        DeleteBuilder {
             client: client,
             index: index,
             typ: typ,
@@ -577,36 +577,36 @@ impl DeleteBuilder {
         }
     }
 
-    fn set_consistency(@self, consistency: Consistency) -> @DeleteBuilder {
+    fn set_consistency(self, consistency: Consistency) -> DeleteBuilder {
         self.consistency = Some(consistency);
         self
     }
-    fn set_parent(@self, parent: ~str) -> @DeleteBuilder {
+    fn set_parent(self, parent: ~str) -> DeleteBuilder {
         // We use the parent for routing.
         self.routing = Some(parent);
         self
     }
-    fn set_refresh(@self, refresh: bool) -> @DeleteBuilder {
+    fn set_refresh(self, refresh: bool) -> DeleteBuilder {
         self.refresh = refresh;
         self
     }
-    fn set_replication(@self, replication: Replication) -> @DeleteBuilder {
+    fn set_replication(self, replication: Replication) -> DeleteBuilder {
         self.replication = Some(replication);
         self
     }
-    fn set_routing(@self, routing: ~str) -> @DeleteBuilder {
+    fn set_routing(self, routing: ~str) -> DeleteBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(@self, timeout: ~str) -> @DeleteBuilder {
+    fn set_timeout(self, timeout: ~str) -> DeleteBuilder {
         self.timeout = Some(timeout);
         self
     }
-    fn set_version(@self, version: uint) -> @DeleteBuilder {
+    fn set_version(self, version: uint) -> DeleteBuilder {
         self.version = Some(version);
         self
     }
-    fn set_version_type(@self, version_type: VersionType) -> @DeleteBuilder {
+    fn set_version_type(self, version_type: VersionType) -> DeleteBuilder {
         self.version_type = version_type;
         self
     }
@@ -677,8 +677,8 @@ pub struct DeleteByQueryBuilder {
 }
 
 impl DeleteByQueryBuilder {
-    static fn new(client: Client) -> @DeleteByQueryBuilder {
-        @DeleteByQueryBuilder {
+    static fn new(client: Client) -> DeleteByQueryBuilder {
+        DeleteByQueryBuilder {
             client: client,
             mut indices: ~[],
             mut types: ~[],
@@ -693,49 +693,49 @@ impl DeleteByQueryBuilder {
         }
     }
 
-    fn set_indices(@self, indices: ~[~str]) -> @DeleteByQueryBuilder {
+    fn set_indices(self, indices: ~[~str]) -> DeleteByQueryBuilder {
         self.indices = indices;
         self
     }
-    fn set_types(@self, types: ~[~str]) -> @DeleteByQueryBuilder {
+    fn set_types(self, types: ~[~str]) -> DeleteByQueryBuilder {
         self.types = types;
         self
     }
     fn set_consistency(
-        @self,
+        self,
         consistency: Consistency
-    ) -> @DeleteByQueryBuilder {
+    ) -> DeleteByQueryBuilder {
         self.consistency = Some(consistency);
         self
     }
-    fn set_refresh(@self, refresh: bool) -> @DeleteByQueryBuilder {
+    fn set_refresh(self, refresh: bool) -> DeleteByQueryBuilder {
         self.refresh = refresh;
         self
     }
     fn set_replication(
-        @self,
+        self,
         replication: Replication
-    ) -> @DeleteByQueryBuilder {
+    ) -> DeleteByQueryBuilder {
         self.replication = Some(replication);
         self
     }
-    fn set_routing(@self, routing: ~str) -> @DeleteByQueryBuilder {
+    fn set_routing(self, routing: ~str) -> DeleteByQueryBuilder {
         self.routing = Some(routing);
         self
     }
-    fn set_timeout(@self, timeout: ~str) -> @DeleteByQueryBuilder {
+    fn set_timeout(self, timeout: ~str) -> DeleteByQueryBuilder {
         self.timeout = Some(timeout);
         self
     }
     fn set_source(
-        @self,
+        self,
         source: ~json::Object
-    ) -> @DeleteByQueryBuilder {
+    ) -> DeleteByQueryBuilder {
         self.source = Some(source);
         self
     }
 
-    fn execute() -> Response {
+    fn execute(self) -> Response {
         let mut path = ~[];
 
         path.push(str::connect(self.indices, ","));
