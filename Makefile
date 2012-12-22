@@ -12,4 +12,4 @@ deps:
 	cargo install url
 
 clean:
-	rm -rf elasticsearch *.so *.dylib *.dSYM
+	rm -rf elasticsearch example *.so *.dylib *.dSYM
