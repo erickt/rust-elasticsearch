@@ -1,8 +1,8 @@
 all:
-	rustc elasticsearch.rc
+	rustc elasticsearch.rs
 
 test:
-	rustc --test elasticsearch.rc
+	rustc --test elasticsearch.rs
 
 example: all
 	rustc -L . example.rs
