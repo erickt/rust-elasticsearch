@@ -1,15 +1,8 @@
 all:
-	rustc elasticsearch.rs
+	rustpkg install elasticsearch
 
-test:
-	rustc --test elasticsearch.rs
-
-example: all
-	rustc -L . example.rs
-
-deps:
-	cargo install zmq
-	cargo install url
+test: all
+	rustpkg install example
 
 clean:
-	rm -rf elasticsearch example *.so *.dylib *.dSYM
+	rm -rf bin build lib

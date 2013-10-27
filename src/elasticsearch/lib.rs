@@ -6,16 +6,17 @@
 extern mod extra;
 extern mod zmq;
 
-use std::io;
 use std::str;
 use std::uint;
+use std::rt::io::Reader;
+use std::rt::io::mem::BufReader;
 
 use extra::json::{Json, ToJson};
 use extra::json;
 use extra::treemap::TreeMap;
 use extra::url;
 
-use zmq::{Context, Socket, ToStr};
+use zmq::{Context, Socket};
 
 /// The low level interface to elasticsearch
 pub trait Transport {
@@ -371,7 +372,7 @@ impl<'self> IndexBuilder<'self> {
 
         match self.version {
             None => { },
-            Some(ref i) => { params.push(fmt!("version=%u", *i)); }
+            Some(ref i) => { params.push(format!("version={}", *i)); }
         }
 
         match self.version_type {
@@ -645,18 +646,18 @@ impl<'self> DeleteBuilder<'self> {
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match self.routing {
             None => { }
-            Some(ref s) => params.push(~"routing=" + *s),
+            Some(ref s) => params.push(format!("routing={}", *s)),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match self.timeout {
             None => { }
-            Some(ref s) => params.push(~"timeout=" + *s),
+            Some(ref s) => params.push(format!("timeout={}", *s)),
         }
 
         match self.version {
             None => { }
-            Some(ref s) => params.push(fmt!("version=%u", *s)),
+            Some(ref s) => params.push(format!("version={}", *s)),
         }
 
         match self.version_type {
@@ -875,7 +876,7 @@ impl ZMQTransport {
     }
 
     pub fn send(&self, request: &str) -> Response {
-        debug!("request: %s", request);
+        debug!("request: {}", request);
 
         match self.socket.send_str(request, 0) {
             Ok(()) => { }
@@ -885,7 +886,7 @@ impl ZMQTransport {
         match self.socket.recv_msg(0) {
             Ok(msg) => {
                 let bytes = msg.to_bytes();
-                debug!("response: %s", str::from_bytes(bytes));
+                debug!("response: {:?}", bytes);
                 Response::parse(bytes)
             },
             Err(e) => fail!(e.to_str()),
@@ -895,19 +896,19 @@ impl ZMQTransport {
 
 /// Zeromq transport implementation
 impl Transport for ZMQTransport {
-    fn head(&self, path: &str) -> Response { self.send(fmt!("HEAD|%s", path)) }
-    fn get(&self, path: &str) -> Response { self.send(fmt!("GET|%s", path)) }
+    fn head(&self, path: &str) -> Response { self.send(format!("HEAD|{}", path)) }
+    fn get(&self, path: &str) -> Response { self.send(format!("GET|{}", path)) }
     fn put(&self, path: &str, source: ~json::Object) -> Response {
-        self.send(fmt!("PUT|%s|%s", path, json::Object(source).to_str()))
+        self.send(format!("PUT|{}|{}", path, json::Object(source).to_str()))
     }
     fn post(&self, path: &str, source: ~json::Object) -> Response {
-        self.send(fmt!("POST|%s|%s", path, json::Object(source).to_str()))
+        self.send(format!("POST|{}|{}", path, json::Object(source).to_str()))
     }
     fn delete(&self, path: &str, source: Option<~json::Object>) -> Response {
         match source {
-            None => self.send(fmt!("DELETE|%s", path)),
+            None => self.send(format!("DELETE|{}", path)),
             Some(source) =>
-                self.send(fmt!("DELETE|%s|%s",
+                self.send(format!("DELETE|{}|{}",
                     path,
                     json::Object(source).to_str())),
         }
@@ -954,18 +955,18 @@ impl Response {
     fn parse_status(msg: &[u8], start: uint, end: uint) -> (uint, ~str) {
         match msg.slice(start,end).iter().position(|c| *c == '|' as u8) {
             None => fail!("invalid response"),
-            Some(i) => (i + 1u, str::from_bytes(msg.slice(start, i))),
+            Some(i) => (i + 1u, str::from_utf8(msg.slice(start, i))),
         }
     }
 
     fn parse_body(msg: &[u8], start: uint, end: uint) -> json::Json {
         if start == end { return json::Null; }
 
-        do io::with_bytes_reader(msg.slice(start, end)) |rdr| {
-            match json::from_reader(rdr) {
-                Ok(json) => json,
-                Err(e) => fail!(e.to_str()),
-            }
+        let mut rdr = BufReader::new(msg.slice(start, end));
+
+        match json::from_reader(&mut rdr as &mut Reader) {
+            Ok(json) => json,
+            Err(e) => fail!(e.to_str()),
         }
     }
 }
