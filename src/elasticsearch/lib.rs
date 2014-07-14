@@ -1,15 +1,12 @@
-#[link(name = "elasticsearch",
-       vers = "0.1",
-       uuid = "51a41dbe-d547-4804-8300-8a1b5d00d093")];
-#[crate_type = "lib"];
+#![crate_name = "elasticsearch"]
 
 extern mod extra;
-extern mod zmq;
+extern mod zmq = "github.com/erickt/rust-zmq";
 
 use std::str;
 use std::uint;
-use std::rt::io::Reader;
-use std::rt::io::mem::BufReader;
+use std::io::Reader;
+use std::io::mem::BufReader;
 
 use extra::json::{Json, ToJson};
 use extra::json;
@@ -89,15 +86,15 @@ pub enum Replication { Sync, Async }
 pub enum OpType { CREATE, INDEX }
 pub enum VersionType { INTERNAL, EXTERNAL }
 
-pub struct CreateIndexBuilder<'self> {
-    client: &'self Client,
+pub struct CreateIndexBuilder<'a> {
+    client: &'a Client,
     index: ~str,
     timeout: Option<~str>,
     source: Option<~json::Object>,
 }
 
-impl<'self> CreateIndexBuilder<'self> {
-    pub fn new(client: &'self Client, index: ~str) -> CreateIndexBuilder<'self> {
+impl<'a> CreateIndexBuilder<'a> {
+    pub fn new(client: &'a Client, index: ~str) -> CreateIndexBuilder<'a> {
         CreateIndexBuilder {
             client: client,
             index: index,
@@ -106,12 +103,12 @@ impl<'self> CreateIndexBuilder<'self> {
         }
     }
 
-    pub fn set_timeout(self, timeout: ~str) -> CreateIndexBuilder<'self> {
+    pub fn set_timeout(self, timeout: ~str) -> CreateIndexBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_source(self, source: ~json::Object) -> CreateIndexBuilder<'self> {
+    pub fn set_source(self, source: ~json::Object) -> CreateIndexBuilder<'a> {
         let mut builder = self;
         builder.source = Some(source);
         builder
@@ -140,14 +137,14 @@ impl<'self> CreateIndexBuilder<'self> {
     }
 }
 
-pub struct DeleteIndexBuilder<'self> {
-    client: &'self Client,
+pub struct DeleteIndexBuilder<'a> {
+    client: &'a Client,
     indices: ~[~str],
     timeout: Option<~str>,
 }
 
-impl<'self> DeleteIndexBuilder<'self> {
-    pub fn new(client: &'self Client) -> DeleteIndexBuilder<'self> {
+impl<'a> DeleteIndexBuilder<'a> {
+    pub fn new(client: &'a Client) -> DeleteIndexBuilder<'a> {
         DeleteIndexBuilder {
             client: client,
             indices: ~[],
@@ -155,12 +152,12 @@ impl<'self> DeleteIndexBuilder<'self> {
         }
     }
 
-    pub fn set_indices(self, indices: ~[~str]) -> DeleteIndexBuilder<'self> {
+    pub fn set_indices(self, indices: ~[~str]) -> DeleteIndexBuilder<'a> {
         let mut builder = self;
         builder.indices = indices;
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> DeleteIndexBuilder<'self> {
+    pub fn set_timeout(self, timeout: ~str) -> DeleteIndexBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
@@ -188,8 +185,8 @@ impl<'self> DeleteIndexBuilder<'self> {
     }
 }
 
-pub struct IndexBuilder<'self> {
-    client: &'self Client,
+pub struct IndexBuilder<'a> {
+    client: &'a Client,
     index: ~str,
     typ: ~str,
     id: Option<~str>,
@@ -210,8 +207,8 @@ pub struct IndexBuilder<'self> {
     source: Option<~json::Object>,
 }
 
-impl<'self> IndexBuilder<'self> {
-    pub fn new(client: &'self Client, index: ~str, typ: ~str) -> IndexBuilder<'self> {
+impl<'a> IndexBuilder<'a> {
+    pub fn new(client: &'a Client, index: ~str, typ: ~str) -> IndexBuilder<'a> {
         IndexBuilder {
             client: client,
             index: index,
@@ -235,72 +232,72 @@ impl<'self> IndexBuilder<'self> {
         }
     }
 
-    pub fn set_id(self, id: ~str) -> IndexBuilder<'self> {
+    pub fn set_id(self, id: ~str) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.id = Some(id);
         builder
     }
-    pub fn set_consistency(self, consistency: Consistency) -> IndexBuilder<'self> {
+    pub fn set_consistency(self, consistency: Consistency) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.consistency = Some(consistency);
         builder
     }
-    pub fn set_op_type(self, op_type: OpType) -> IndexBuilder<'self> {
+    pub fn set_op_type(self, op_type: OpType) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.op_type = op_type;
         builder
     }
-    pub fn set_parent(self, parent: ~str) -> IndexBuilder<'self> {
+    pub fn set_parent(self, parent: ~str) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.parent = Some(parent);
         builder
     }
-    pub fn set_percolate(self, percolate: ~str) -> IndexBuilder<'self> {
+    pub fn set_percolate(self, percolate: ~str) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.percolate = Some(percolate);
         builder
     }
-    pub fn set_refresh(self, refresh: bool) -> IndexBuilder<'self> {
+    pub fn set_refresh(self, refresh: bool) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.refresh = refresh;
         builder
     }
-    pub fn set_replication(self, replication: Replication) -> IndexBuilder<'self> {
+    pub fn set_replication(self, replication: Replication) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.replication = Some(replication);
         builder
     }
-    pub fn set_routing(self, routing: ~str) -> IndexBuilder<'self> {
+    pub fn set_routing(self, routing: ~str) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.routing = Some(routing);
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> IndexBuilder<'self> {
+    pub fn set_timeout(self, timeout: ~str) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_timestamp(self, timestamp: ~str) -> IndexBuilder<'self> {
+    pub fn set_timestamp(self, timestamp: ~str) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.timestamp = Some(timestamp);
         builder
     }
-    pub fn set_ttl(self, ttl: ~str) -> IndexBuilder<'self> {
+    pub fn set_ttl(self, ttl: ~str) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.ttl = Some(ttl);
         builder
     }
-    pub fn set_version(self, version: uint) -> IndexBuilder<'self> {
+    pub fn set_version(self, version: uint) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.version = Some(version);
         builder
     }
-    pub fn set_version_type(self, version_type: VersionType) -> IndexBuilder<'self> {
+    pub fn set_version_type(self, version_type: VersionType) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.version_type = version_type;
         builder
     }
-    pub fn set_source(self, source: ~json::Object) -> IndexBuilder<'self> {
+    pub fn set_source(self, source: ~json::Object) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.source = Some(source);
         builder
@@ -406,8 +403,8 @@ pub enum SearchType {
     Count,
 }
 
-pub struct SearchBuilder<'self> {
-    client: &'self Client,
+pub struct SearchBuilder<'a> {
+    client: &'a Client,
     indices: ~[~str],
     types: ~[~str],
 
@@ -420,8 +417,8 @@ pub struct SearchBuilder<'self> {
     source: Option<~json::Object>
 }
 
-impl<'self> SearchBuilder<'self> {
-    pub fn new(client: &'self Client) -> SearchBuilder<'self> {
+impl<'a> SearchBuilder<'a> {
+    pub fn new(client: &'a Client) -> SearchBuilder<'a> {
         SearchBuilder {
             client: client,
             indices: ~[],
@@ -437,42 +434,42 @@ impl<'self> SearchBuilder<'self> {
         }
     }
 
-    pub fn set_indices(self, indices: ~[~str]) -> SearchBuilder<'self> {
+    pub fn set_indices(self, indices: ~[~str]) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.indices = indices;
         builder
     }
-    pub fn set_types(self, types: ~[~str]) -> SearchBuilder<'self> {
+    pub fn set_types(self, types: ~[~str]) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.types = types;
         builder
     }
-    pub fn set_preference(self, preference: ~str) -> SearchBuilder<'self> {
+    pub fn set_preference(self, preference: ~str) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.preference = Some(preference);
         builder
     }
-    pub fn set_routing(self, routing: ~str) -> SearchBuilder<'self> {
+    pub fn set_routing(self, routing: ~str) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.routing = Some(routing);
         builder
     }
-    pub fn set_scroll(self, scroll: ~str) -> SearchBuilder<'self> {
+    pub fn set_scroll(self, scroll: ~str) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.scroll = Some(scroll);
         builder
     }
-    pub fn set_search_type(self, search_type: SearchType) -> SearchBuilder<'self> {
+    pub fn set_search_type(self, search_type: SearchType) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.search_type = Some(search_type);
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> SearchBuilder<'self> {
+    pub fn set_timeout(self, timeout: ~str) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_source(self, source: ~json::Object) -> SearchBuilder<'self> {
+    pub fn set_source(self, source: ~json::Object) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.source = Some(source);
         builder
@@ -545,8 +542,8 @@ impl<'self> SearchBuilder<'self> {
     }
 }
 
-pub struct DeleteBuilder<'self> {
-    client: &'self Client,
+pub struct DeleteBuilder<'a> {
+    client: &'a Client,
     index: ~str,
     typ: ~str,
     id: ~str,
@@ -560,8 +557,8 @@ pub struct DeleteBuilder<'self> {
     version_type: VersionType,
 }
 
-impl<'self> DeleteBuilder<'self> {
-    pub fn new(client: &'self Client, index: ~str, typ: ~str, id: ~str) -> DeleteBuilder<'self> {
+impl<'a> DeleteBuilder<'a> {
+    pub fn new(client: &'a Client, index: ~str, typ: ~str, id: ~str) -> DeleteBuilder<'a> {
         DeleteBuilder {
             client: client,
             index: index,
@@ -577,43 +574,43 @@ impl<'self> DeleteBuilder<'self> {
         }
     }
 
-    pub fn set_consistency(self, consistency: Consistency) -> DeleteBuilder<'self> {
+    pub fn set_consistency(self, consistency: Consistency) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.consistency = Some(consistency);
         builder
     }
-    pub fn set_parent(self, parent: ~str) -> DeleteBuilder<'self> {
+    pub fn set_parent(self, parent: ~str) -> DeleteBuilder<'a> {
         // We use the parent for routing.
         let mut builder = self;
         builder.routing = Some(parent);
         builder
     }
-    pub fn set_refresh(self, refresh: bool) -> DeleteBuilder<'self> {
+    pub fn set_refresh(self, refresh: bool) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.refresh = refresh;
         builder
     }
-    pub fn set_replication(self, replication: Replication) -> DeleteBuilder<'self> {
+    pub fn set_replication(self, replication: Replication) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.replication = Some(replication);
         builder
     }
-    pub fn set_routing(self, routing: ~str) -> DeleteBuilder<'self> {
+    pub fn set_routing(self, routing: ~str) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.routing = Some(routing);
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> DeleteBuilder<'self> {
+    pub fn set_timeout(self, timeout: ~str) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_version(self, version: uint) -> DeleteBuilder<'self> {
+    pub fn set_version(self, version: uint) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.version = Some(version);
         builder
     }
-    pub fn set_version_type(self, version_type: VersionType) -> DeleteBuilder<'self> {
+    pub fn set_version_type(self, version_type: VersionType) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.version_type = version_type;
         builder
@@ -674,8 +671,8 @@ impl<'self> DeleteBuilder<'self> {
     }
 }
 
-pub struct DeleteByQueryBuilder<'self> {
-    client: &'self Client,
+pub struct DeleteByQueryBuilder<'a> {
+    client: &'a Client,
     indices: ~[~str],
     types: ~[~str],
 
@@ -688,8 +685,8 @@ pub struct DeleteByQueryBuilder<'self> {
     source: Option<~json::Object>,
 }
 
-impl<'self> DeleteByQueryBuilder<'self> {
-    pub fn new(client: &'self Client) -> DeleteByQueryBuilder<'self> {
+impl<'a> DeleteByQueryBuilder<'a> {
+    pub fn new(client: &'a Client) -> DeleteByQueryBuilder<'a> {
         DeleteByQueryBuilder {
             client: client,
             indices: ~[],
@@ -705,42 +702,42 @@ impl<'self> DeleteByQueryBuilder<'self> {
         }
     }
 
-    pub fn set_indices(self, indices: ~[~str]) -> DeleteByQueryBuilder<'self> {
+    pub fn set_indices(self, indices: ~[~str]) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.indices = indices;
         builder
     }
-    pub fn set_types(self, types: ~[~str]) -> DeleteByQueryBuilder<'self> {
+    pub fn set_types(self, types: ~[~str]) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.types = types;
         builder
     }
-    pub fn set_consistency(self, consistency: Consistency) -> DeleteByQueryBuilder<'self> {
+    pub fn set_consistency(self, consistency: Consistency) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.consistency = Some(consistency);
         builder
     }
-    pub fn set_refresh(self, refresh: bool) -> DeleteByQueryBuilder<'self> {
+    pub fn set_refresh(self, refresh: bool) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.refresh = refresh;
         builder
     }
-    pub fn set_replication(self, replication: Replication) -> DeleteByQueryBuilder<'self> {
+    pub fn set_replication(self, replication: Replication) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.replication = Some(replication);
         builder
     }
-    pub fn set_routing(self, routing: ~str) -> DeleteByQueryBuilder<'self> {
+    pub fn set_routing(self, routing: ~str) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.routing = Some(routing);
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> DeleteByQueryBuilder<'self> {
+    pub fn set_timeout(self, timeout: ~str) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_source(self, source: ~json::Object) -> DeleteByQueryBuilder<'self> {
+    pub fn set_source(self, source: ~json::Object) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.source = Some(source);
         builder
@@ -814,12 +811,12 @@ impl JsonListBuilder {
         builder
     }
 
-    pub fn push_list(self, f: &fn(JsonListBuilder) -> JsonListBuilder) -> JsonListBuilder {
+    pub fn push_list(self, f: |JsonListBuilder| -> JsonListBuilder) -> JsonListBuilder {
         let builder = JsonListBuilder::new();
         self.push(f(builder).unwrap())
     }
 
-    pub fn push_object(self, f: &fn(JsonObjectBuilder) -> JsonObjectBuilder) -> JsonListBuilder {
+    pub fn push_object(self, f: |JsonObjectBuilder| -> JsonObjectBuilder) -> JsonListBuilder {
         let builder = JsonObjectBuilder::new();
         self.push(json::Object(f(builder).unwrap()))
     }
@@ -845,16 +842,27 @@ impl JsonObjectBuilder {
         builder
     }
 
-    pub fn insert_list<'a>(self, key: ~str, f: &fn(JsonListBuilder) -> JsonListBuilder) -> JsonObjectBuilder {
+    pub fn insert_list<'a>(self, key: ~str, f: |JsonListBuilder| -> JsonListBuilder) -> JsonObjectBuilder {
         let builder = JsonListBuilder::new();
         self.insert(key, f(builder).unwrap())
     }
 
-    pub fn insert_object<'a>(self, key: ~str, f: &fn(JsonObjectBuilder) -> JsonObjectBuilder) -> JsonObjectBuilder {
+    pub fn insert_object<'a>(self, key: ~str, f: |JsonObjectBuilder| -> JsonObjectBuilder) -> JsonObjectBuilder {
         let builder = JsonObjectBuilder::new();
         self.insert(key, json::Object(f(builder).unwrap()))
     }
 }
+
+/// Transport to tralk to Elasticsearch with HTTP
+/*
+pub struct HTTPTransport { 
+    url: Url,
+}
+
+impl HTTPTransport {
+    fn new(url: Url)
+}
+*/
 
 /// Transport to talk to Elasticsearch with zeromq
 pub struct ZMQTransport { socket: zmq::Socket }
