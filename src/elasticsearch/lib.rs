@@ -1,17 +1,21 @@
 #![crate_name = "elasticsearch"]
 
-extern mod extra;
-extern mod zmq = "github.com/erickt/rust-zmq";
+#![feature(phase)]
+
+#[phase(plugin, link)]
+extern crate log;
+
+extern crate serialize;
+extern crate url;
+extern crate zmq;
 
 use std::str;
 use std::uint;
-use std::io::Reader;
-use std::io::mem::BufReader;
+use std::io::{Reader, BufReader};
+use std::collections::TreeMap;
 
-use extra::json::{Json, ToJson};
-use extra::json;
-use extra::treemap::TreeMap;
-use extra::url;
+use serialize::json::{Json, ToJson};
+use serialize::json;
 
 use zmq::{Context, Socket};
 
@@ -19,24 +23,24 @@ use zmq::{Context, Socket};
 pub trait Transport {
     fn head(&self, path: &str) -> Response;
     fn get(&self, path: &str) -> Response;
-    fn put(&self, path: &str, source: ~json::Object) -> Response;
-    fn post(&self, path: &str, source: ~json::Object) -> Response;
-    fn delete(&self, path: &str, source: Option<~json::Object>) -> Response;
+    fn put(&self, path: &str, source: json::Object) -> Response;
+    fn post(&self, path: &str, source: json::Object) -> Response;
+    fn delete(&self, path: &str, source: Option<json::Object>) -> Response;
 }
 
 /// The high level interface to elasticsearch
 pub struct Client {
-    transport: ~Transport
+    transport: Box<Transport>
 }
 
 impl Client {
     /// Create an elasticsearch client
-    pub fn new(transport: ~Transport) -> Client {
+    pub fn new(transport: Box<Transport>) -> Client {
         Client { transport: transport }
     }
 
     /// Create an index
-    pub fn prepare_create_index<'a>(&'a self, index: ~str) -> CreateIndexBuilder<'a> {
+    pub fn prepare_create_index<'a>(&'a self, index: String) -> CreateIndexBuilder<'a> {
         CreateIndexBuilder::new(self, index)
     }
 
@@ -52,11 +56,11 @@ impl Client {
             url::encode_component(typ),
             url::encode_component(id)
         ].connect("/");
-        self.transport.get(path)
+        self.transport.get(path.as_slice())
     }
 
     /// Create an index builder that will create documents
-    pub fn prepare_index<'a>(&'a self, index: ~str, typ: ~str) -> IndexBuilder<'a> {
+    pub fn prepare_index<'a>(&'a self, index: String, typ: String) -> IndexBuilder<'a> {
         IndexBuilder::new(self, index, typ)
     }
 
@@ -66,12 +70,12 @@ impl Client {
     }
 
     /// Delete a document
-    pub fn delete(&self, index: ~str, typ: ~str, id: ~str) -> Response {
+    pub fn delete(&self, index: String, typ: String, id: String) -> Response {
         self.prepare_delete(index, typ, id).execute()
     }
 
     /// Delete a document
-    pub fn prepare_delete<'a>(&'a self, index: ~str, typ: ~str, id: ~str) -> DeleteBuilder<'a> {
+    pub fn prepare_delete<'a>(&'a self, index: String, typ: String, id: String) -> DeleteBuilder<'a> {
         DeleteBuilder::new(self, index, typ, id)
     }
 
@@ -88,13 +92,13 @@ pub enum VersionType { INTERNAL, EXTERNAL }
 
 pub struct CreateIndexBuilder<'a> {
     client: &'a Client,
-    index: ~str,
-    timeout: Option<~str>,
-    source: Option<~json::Object>,
+    index: String,
+    timeout: Option<String>,
+    source: Option<json::Object>,
 }
 
 impl<'a> CreateIndexBuilder<'a> {
-    pub fn new(client: &'a Client, index: ~str) -> CreateIndexBuilder<'a> {
+    pub fn new(client: &'a Client, index: String) -> CreateIndexBuilder<'a> {
         CreateIndexBuilder {
             client: client,
             index: index,
@@ -103,12 +107,12 @@ impl<'a> CreateIndexBuilder<'a> {
         }
     }
 
-    pub fn set_timeout(self, timeout: ~str) -> CreateIndexBuilder<'a> {
+    pub fn set_timeout(self, timeout: String) -> CreateIndexBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_source(self, source: ~json::Object) -> CreateIndexBuilder<'a> {
+    pub fn set_source(self, source: json::Object) -> CreateIndexBuilder<'a> {
         let mut builder = self;
         builder.source = Some(source);
         builder
@@ -116,99 +120,99 @@ impl<'a> CreateIndexBuilder<'a> {
     pub fn execute(&mut self) -> Response {
         let mut path = url::encode_component(self.index);
 
-        let mut params = ~[];
+        let mut params = vec!();
 
         match self.timeout {
             None => { },
             Some(ref s) => {
-                params.push(~"timeout=" + *s);
+                params.push(format!("timeout={}", s));
             }
         }
 
         if !params.is_empty() {
             path.push_str("?");
-            path.push_str(params.connect("&"));
+            path.push_str(params.connect("&").as_slice());
         }
 
         match self.source.take() {
-            None => self.client.transport.put(path, ~TreeMap::new()),
-            Some(source) => self.client.transport.put(path, source),
+            None => self.client.transport.put(path.as_slice(), TreeMap::new()),
+            Some(source) => self.client.transport.put(path.as_slice(), source),
         }
     }
 }
 
 pub struct DeleteIndexBuilder<'a> {
     client: &'a Client,
-    indices: ~[~str],
-    timeout: Option<~str>,
+    indices: Vec<String>,
+    timeout: Option<String>,
 }
 
 impl<'a> DeleteIndexBuilder<'a> {
     pub fn new(client: &'a Client) -> DeleteIndexBuilder<'a> {
         DeleteIndexBuilder {
             client: client,
-            indices: ~[],
+            indices: vec!(),
             timeout: None,
         }
     }
 
-    pub fn set_indices(self, indices: ~[~str]) -> DeleteIndexBuilder<'a> {
+    pub fn set_indices(self, indices: Vec<String>) -> DeleteIndexBuilder<'a> {
         let mut builder = self;
         builder.indices = indices;
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> DeleteIndexBuilder<'a> {
+    pub fn set_timeout(self, timeout: String) -> DeleteIndexBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
     pub fn execute(&mut self) -> Response {
-        let indices = do self.indices.map |i| {
+        let indices: Vec<String> = self.indices.iter().map(|i| {
             url::encode_component(*i)
-        };
+        }).collect();
         let mut path = indices.connect(",");
 
         // Build the query parameters.
-        let mut params = ~[];
+        let mut params = vec!();
 
         match self.timeout {
             None => { },
-            Some(ref timeout) => params.push(~"timeout=" + *timeout),
+            Some(ref timeout) => params.push(format!("timeout={}", timeout)),
         }
 
         if !params.is_empty() {
             path.push_str("?");
-            path.push_str(params.connect("&"));
+            path.push_str(params.connect("&").as_slice());
         }
 
-        self.client.transport.delete(path, None)
+        self.client.transport.delete(path.as_slice(), None)
     }
 }
 
 pub struct IndexBuilder<'a> {
     client: &'a Client,
-    index: ~str,
-    typ: ~str,
-    id: Option<~str>,
+    index: String,
+    typ: String,
+    id: Option<String>,
 
     consistency: Option<Consistency>,
     op_type: OpType,
-    parent: Option<~str>,
-    percolate: Option<~str>,
+    parent: Option<String>,
+    percolate: Option<String>,
     refresh: bool,
     replication: Option<Replication>,
-    routing: Option<~str>,
-    timeout: Option<~str>,
-    timestamp: Option<~str>,
-    ttl: Option<~str>,
+    routing: Option<String>,
+    timeout: Option<String>,
+    timestamp: Option<String>,
+    ttl: Option<String>,
     version: Option<uint>,
     version_type: VersionType,
 
-    source: Option<~json::Object>,
+    source: Option<json::Object>,
 }
 
 impl<'a> IndexBuilder<'a> {
-    pub fn new(client: &'a Client, index: ~str, typ: ~str) -> IndexBuilder<'a> {
+    pub fn new(client: &'a Client, index: String, typ: String) -> IndexBuilder<'a> {
         IndexBuilder {
             client: client,
             index: index,
@@ -232,7 +236,7 @@ impl<'a> IndexBuilder<'a> {
         }
     }
 
-    pub fn set_id(self, id: ~str) -> IndexBuilder<'a> {
+    pub fn set_id(self, id: String) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.id = Some(id);
         builder
@@ -247,12 +251,12 @@ impl<'a> IndexBuilder<'a> {
         builder.op_type = op_type;
         builder
     }
-    pub fn set_parent(self, parent: ~str) -> IndexBuilder<'a> {
+    pub fn set_parent(self, parent: String) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.parent = Some(parent);
         builder
     }
-    pub fn set_percolate(self, percolate: ~str) -> IndexBuilder<'a> {
+    pub fn set_percolate(self, percolate: String) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.percolate = Some(percolate);
         builder
@@ -267,22 +271,22 @@ impl<'a> IndexBuilder<'a> {
         builder.replication = Some(replication);
         builder
     }
-    pub fn set_routing(self, routing: ~str) -> IndexBuilder<'a> {
+    pub fn set_routing(self, routing: String) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.routing = Some(routing);
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> IndexBuilder<'a> {
+    pub fn set_timeout(self, timeout: String) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_timestamp(self, timestamp: ~str) -> IndexBuilder<'a> {
+    pub fn set_timestamp(self, timestamp: String) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.timestamp = Some(timestamp);
         builder
     }
-    pub fn set_ttl(self, ttl: ~str) -> IndexBuilder<'a> {
+    pub fn set_ttl(self, ttl: String) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.ttl = Some(ttl);
         builder
@@ -297,16 +301,16 @@ impl<'a> IndexBuilder<'a> {
         builder.version_type = version_type;
         builder
     }
-    pub fn set_source(self, source: ~json::Object) -> IndexBuilder<'a> {
+    pub fn set_source(self, source: json::Object) -> IndexBuilder<'a> {
         let mut builder = self;
         builder.source = Some(source);
         builder
     }
     pub fn execute(&mut self) -> Response {
-        let mut path = ~[
+        let mut path = vec!(
             url::encode_component(self.index),
-            url::encode_component(self.typ)
-        ];
+            url::encode_component(self.typ),
+        );
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match self.id {
@@ -315,81 +319,81 @@ impl<'a> IndexBuilder<'a> {
         }
 
         let mut path = path.connect("/");
-        let mut params = ~[];
+        let mut params = vec!();
 
         match self.consistency {
             None => { },
-            Some(One) => params.push(~"consistency=one"),
-            Some(Quorum) => params.push(~"consistency=quorum"),
-            Some(All) => params.push(~"consistency=all"),
+            Some(One) => params.push("consistency=one".to_string()),
+            Some(Quorum) => params.push("consistency=quorum".to_string()),
+            Some(All) => params.push("consistency=all".to_string()),
         }
 
         match self.op_type {
-            CREATE => params.push(~"op_type=create"),
+            CREATE => params.push("op_type=create".to_string()),
             INDEX => { }
         }
 
         match self.parent {
             None => { },
-            Some(ref s) => params.push(~"parent=" + *s),
+            Some(ref s) => params.push(format!("parent={}", s)),
         }
 
         match self.percolate {
             None => { }
-            Some(ref s) =>  params.push(~"percolate=" + *s),
+            Some(ref s) =>  params.push(format!("percolate={}", s)),
         }
 
-        if self.refresh { params.push(~"refresh=true"); }
+        if self.refresh { params.push("refresh=true".to_string()); }
 
         match self.replication {
             None => { },
-            Some(Sync) => params.push(~"replication=sync"),
-            Some(Async) => params.push(~"replication=async"),
+            Some(Sync) => params.push("replication=sync".to_string()),
+            Some(Async) => params.push("replication=async".to_string()),
         }
 
         match self.routing {
             None => { },
-            Some(ref s) => params.push(~"routing=" + *s),
+            Some(ref s) => params.push(format!("routing={}", s)),
         }
 
         match self.timeout {
             None => { },
-            Some(ref s) => params.push(~"timeout=" + *s),
+            Some(ref s) => params.push(format!("timeout={}", s)),
         }
 
         match self.timestamp {
             None => { },
-            Some(ref s) => params.push(~"timestamp=" + *s),
+            Some(ref s) => params.push(format!("timestamp={}", s)),
         }
 
         match self.ttl {
             None => { },
-            Some(ref s) => params.push(~"ttl=" + *s),
+            Some(ref s) => params.push(format!("ttl={}", s)),
         }
 
         match self.version {
             None => { },
-            Some(ref i) => { params.push(format!("version={}", *i)); }
+            Some(ref i) => { params.push(format!("version={}", i)); }
         }
 
         match self.version_type {
             INTERNAL => { },
-            EXTERNAL => params.push(~"version_type=external"),
+            EXTERNAL => params.push("version_type=external".to_string()),
         }
 
         if !params.is_empty() {
             path.push_str("?");
-            path.push_str(params.connect("&"));
+            path.push_str(params.connect("&").as_slice());
         }
 
         let source = match self.source.take() {
-            None => ~TreeMap::new(),
+            None => TreeMap::new(),
             Some(source) => source,
         };
 
         match self.id {
-            None => self.client.transport.post(path, source),
-            Some(_) => self.client.transport.put(path, source),
+            None => self.client.transport.post(path.as_slice(), source),
+            Some(_) => self.client.transport.put(path.as_slice(), source),
         }
     }
 }
@@ -405,24 +409,24 @@ pub enum SearchType {
 
 pub struct SearchBuilder<'a> {
     client: &'a Client,
-    indices: ~[~str],
-    types: ~[~str],
+    indices: Vec<String>,
+    types: Vec<String>,
 
-    preference: Option<~str>,
-    routing: Option<~str>,
-    scroll: Option<~str>,
+    preference: Option<String>,
+    routing: Option<String>,
+    scroll: Option<String>,
     search_type: Option<SearchType>,
-    timeout: Option<~str>,
+    timeout: Option<String>,
 
-    source: Option<~json::Object>
+    source: Option<json::Object>
 }
 
 impl<'a> SearchBuilder<'a> {
     pub fn new(client: &'a Client) -> SearchBuilder<'a> {
         SearchBuilder {
             client: client,
-            indices: ~[],
-            types: ~[],
+            indices: vec!(),
+            types: vec!(),
 
             preference: None,
             routing: None,
@@ -434,27 +438,27 @@ impl<'a> SearchBuilder<'a> {
         }
     }
 
-    pub fn set_indices(self, indices: ~[~str]) -> SearchBuilder<'a> {
+    pub fn set_indices(self, indices: Vec<String>) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.indices = indices;
         builder
     }
-    pub fn set_types(self, types: ~[~str]) -> SearchBuilder<'a> {
+    pub fn set_types(self, types: Vec<String>) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.types = types;
         builder
     }
-    pub fn set_preference(self, preference: ~str) -> SearchBuilder<'a> {
+    pub fn set_preference(self, preference: String) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.preference = Some(preference);
         builder
     }
-    pub fn set_routing(self, routing: ~str) -> SearchBuilder<'a> {
+    pub fn set_routing(self, routing: String) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.routing = Some(routing);
         builder
     }
-    pub fn set_scroll(self, scroll: ~str) -> SearchBuilder<'a> {
+    pub fn set_scroll(self, scroll: String) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.scroll = Some(scroll);
         builder
@@ -464,101 +468,101 @@ impl<'a> SearchBuilder<'a> {
         builder.search_type = Some(search_type);
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> SearchBuilder<'a> {
+    pub fn set_timeout(self, timeout: String) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_source(self, source: ~json::Object) -> SearchBuilder<'a> {
+    pub fn set_source(self, source: json::Object) -> SearchBuilder<'a> {
         let mut builder = self;
         builder.source = Some(source);
         builder
     }
     pub fn execute(&mut self) -> Response {
-        let indices = do self.indices.map |i| {
+        let indices: Vec<String> = self.indices.iter().map(|i| {
             url::encode_component(*i)
-        };
+        }).collect();
 
-        let types = do self.types.map |t| {
+        let types: Vec<String> = self.types.iter().map(|t| {
             url::encode_component(*t)
-        };
+        }).collect();
 
-        let mut path = ~[];
+        let mut path = vec!();
 
         path.push(indices.connect(","));
         path.push(types.connect(","));
-        path.push(~"_search");
+        path.push("_search".to_string());
 
         let mut path = path.connect("/");
 
         // Build the query parameters.
-        let mut params = ~[];
+        let mut params = vec!();
 
         match self.preference {
             None => { },
-            Some(ref s) => params.push(~"preference=" + *s),
+            Some(ref s) => params.push(format!("preference={}", s)),
         }
 
         match self.routing {
             None => { },
-            Some(ref s) => params.push(~"routing=" + *s),
+            Some(ref s) => params.push(format!("routing={}", s)),
         }
 
         match self.scroll {
             None => { },
-            Some(ref s) => params.push(~"scroll=" + *s),
+            Some(ref s) => params.push(format!("scroll={}", s)),
         }
 
         match self.search_type {
             None => { },
             Some(DfsQueryThenFetch) =>
-                params.push(~"search_type=dfs_query_then_fetch"),
+                params.push("search_type=dfs_query_then_fetch".to_string()),
             Some(QueryThenFetch) =>
-                params.push(~"search_type=query_then_fetch"),
+                params.push("search_type=query_then_fetch".to_string()),
             Some(DfsQueryAndFetch) =>
-                params.push(~"search_type=dfs_query_and_fetch"),
+                params.push("search_type=dfs_query_and_fetch".to_string()),
             Some(QueryAndFetch) =>
-                params.push(~"search_type=query_and_fetch"),
-            Some(Scan) => params.push(~"search_type=scan"),
-            Some(Count) => params.push(~"search_type=count"),
+                params.push("search_type=query_and_fetch".to_string()),
+            Some(Scan) => params.push("search_type=scan".to_string()),
+            Some(Count) => params.push("search_type=count".to_string()),
         }
 
         match self.timeout {
             None => { }
-            Some(ref s) => params.push(~"timeout=" + *s),
+            Some(ref s) => params.push(format!("timeout={}", s)),
         }
 
         if !params.is_empty() {
             path.push_str("?");
-            path.push_str(params.connect("&"));
+            path.push_str(params.connect("&").as_slice());
         }
 
         let source = match self.source.take() {
-            None => ~TreeMap::new(),
+            None => TreeMap::new(),
             Some(source) => source,
         };
 
-        self.client.transport.post(path, source)
+        self.client.transport.post(path.as_slice(), source)
     }
 }
 
 pub struct DeleteBuilder<'a> {
     client: &'a Client,
-    index: ~str,
-    typ: ~str,
-    id: ~str,
+    index: String,
+    typ: String,
+    id: String,
 
     consistency: Option<Consistency>,
     refresh: bool,
     replication: Option<Replication>,
-    routing: Option<~str>,
-    timeout: Option<~str>,
+    routing: Option<String>,
+    timeout: Option<String>,
     version: Option<uint>,
     version_type: VersionType,
 }
 
 impl<'a> DeleteBuilder<'a> {
-    pub fn new(client: &'a Client, index: ~str, typ: ~str, id: ~str) -> DeleteBuilder<'a> {
+    pub fn new(client: &'a Client, index: String, typ: String, id: String) -> DeleteBuilder<'a> {
         DeleteBuilder {
             client: client,
             index: index,
@@ -579,7 +583,7 @@ impl<'a> DeleteBuilder<'a> {
         builder.consistency = Some(consistency);
         builder
     }
-    pub fn set_parent(self, parent: ~str) -> DeleteBuilder<'a> {
+    pub fn set_parent(self, parent: String) -> DeleteBuilder<'a> {
         // We use the parent for routing.
         let mut builder = self;
         builder.routing = Some(parent);
@@ -595,12 +599,12 @@ impl<'a> DeleteBuilder<'a> {
         builder.replication = Some(replication);
         builder
     }
-    pub fn set_routing(self, routing: ~str) -> DeleteBuilder<'a> {
+    pub fn set_routing(self, routing: String) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.routing = Some(routing);
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> DeleteBuilder<'a> {
+    pub fn set_timeout(self, timeout: String) -> DeleteBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
@@ -623,74 +627,74 @@ impl<'a> DeleteBuilder<'a> {
         ].connect("/");
 
         // Build the query parameters.
-        let mut params = ~[];
+        let mut params = vec!();
 
         match self.consistency {
             None => { },
-            Some(One) => params.push(~"consistency=one"),
-            Some(Quorum) => params.push(~"consistency=quorum"),
-            Some(All) => params.push(~"consistency=all"),
+            Some(One) => params.push("consistency=one"),
+            Some(Quorum) => params.push("consistency=quorum"),
+            Some(All) => params.push("consistency=all"),
         }
 
-        if self.refresh { params.push(~"refresh=true"); }
+        if self.refresh { params.push("refresh=true"); }
 
         match self.replication {
             None => { }
-            Some(Sync) => params.push(~"replication=sync"),
-            Some(Async) => params.push(~"replication=async"),
+            Some(Sync) => params.push("replication=sync"),
+            Some(Async) => params.push("replication=async"),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match self.routing {
             None => { }
-            Some(ref s) => params.push(format!("routing={}", *s)),
+            Some(ref s) => params.push(format!("routing={}", *s).as_slice()),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match self.timeout {
             None => { }
-            Some(ref s) => params.push(format!("timeout={}", *s)),
+            Some(ref s) => params.push(format!("timeout={}", *s).as_slice()),
         }
 
         match self.version {
             None => { }
-            Some(ref s) => params.push(format!("version={}", *s)),
+            Some(ref s) => params.push(format!("version={}", *s).as_slice()),
         }
 
         match self.version_type {
             INTERNAL => { }
-            EXTERNAL => params.push(~"version_type=external"),
+            EXTERNAL => params.push("version_type=external"),
         }
 
         if !params.is_empty() {
             path.push_str("?");
-            path.push_str(params.connect("&"));
+            path.push_str(params.connect("&").as_slice());
         }
 
-        self.client.transport.delete(path, None)
+        self.client.transport.delete(path.as_slice(), None)
     }
 }
 
 pub struct DeleteByQueryBuilder<'a> {
     client: &'a Client,
-    indices: ~[~str],
-    types: ~[~str],
+    indices: Vec<String>,
+    types: Vec<String>,
 
     consistency: Option<Consistency>,
     refresh: bool,
     replication: Option<Replication>,
-    routing: Option<~str>,
-    timeout: Option<~str>,
+    routing: Option<String>,
+    timeout: Option<String>,
 
-    source: Option<~json::Object>,
+    source: Option<json::Object>,
 }
 
 impl<'a> DeleteByQueryBuilder<'a> {
     pub fn new(client: &'a Client) -> DeleteByQueryBuilder<'a> {
         DeleteByQueryBuilder {
             client: client,
-            indices: ~[],
-            types: ~[],
+            indices: vec!(),
+            types: vec!(),
 
             consistency: None,
             refresh: false,
@@ -702,12 +706,12 @@ impl<'a> DeleteByQueryBuilder<'a> {
         }
     }
 
-    pub fn set_indices(self, indices: ~[~str]) -> DeleteByQueryBuilder<'a> {
+    pub fn set_indices(self, indices: Vec<String>) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.indices = indices;
         builder
     }
-    pub fn set_types(self, types: ~[~str]) -> DeleteByQueryBuilder<'a> {
+    pub fn set_types(self, types: Vec<String>) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.types = types;
         builder
@@ -727,80 +731,80 @@ impl<'a> DeleteByQueryBuilder<'a> {
         builder.replication = Some(replication);
         builder
     }
-    pub fn set_routing(self, routing: ~str) -> DeleteByQueryBuilder<'a> {
+    pub fn set_routing(self, routing: String) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.routing = Some(routing);
         builder
     }
-    pub fn set_timeout(self, timeout: ~str) -> DeleteByQueryBuilder<'a> {
+    pub fn set_timeout(self, timeout: String) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn set_source(self, source: ~json::Object) -> DeleteByQueryBuilder<'a> {
+    pub fn set_source(self, source: json::Object) -> DeleteByQueryBuilder<'a> {
         let mut builder = self;
         builder.source = Some(source);
         builder
     }
 
     pub fn execute(&mut self) -> Response {
-        let mut path = ~[];
+        let mut path = vec!();
 
         path.push(self.indices.connect(","));
         path.push(self.types.connect(","));
-        path.push(~"_query");
+        path.push("_query".to_string());
 
         let mut path = path.connect("/");
 
         // Build the query parameters.
-        let mut params = ~[];
+        let mut params = vec!();
 
         match self.consistency {
             None => {}
-            Some(One) => params.push(~"consistency=one"),
-            Some(Quorum) => params.push(~"consistency=quorum"),
-            Some(All) => params.push(~"consistency=all"),
+            Some(One) => params.push("consistency=one".to_string()),
+            Some(Quorum) => params.push("consistency=quorum".to_string()),
+            Some(All) => params.push("consistency=all".to_string()),
         }
 
-        if self.refresh { params.push(~"refresh=true"); }
+        if self.refresh { params.push("refresh=true".to_string()); }
 
         match self.replication {
             None => { }
-            Some(Sync)  => params.push(~"replication=sync"),
-            Some(Async) => params.push(~"replication=async"),
+            Some(Sync)  => params.push("replication=sync".to_string()),
+            Some(Async) => params.push("replication=async".to_string()),
         }
 
         match self.routing {
             None => { }
-            Some(ref routing) => params.push(~"routing=" + *routing),
+            Some(ref routing) => params.push(format!("routing={}", routing)),
         }
 
         match self.timeout {
             None => { }
-            Some(ref timeout) => params.push(~"timeout=" + *timeout),
+            Some(ref timeout) => params.push(format!("timeout={}", timeout)),
         }
 
         if !params.is_empty() {
             path.push_str("?");
-            path.push_str(params.connect("&"));
+            path.push_str(params.connect("&").as_slice());
         }
 
         let source = self.source.take();
 
-        self.client.transport.delete(path, source)
+        self.client.transport.delete(path.as_slice(), source)
     }
 }
 
 pub struct JsonListBuilder {
-    list: ~[Json]
+    list: Vec<Json>
 }
 
 impl JsonListBuilder {
     pub fn new() -> JsonListBuilder {
-        JsonListBuilder { list: ~[] }
+        JsonListBuilder { list: vec!() }
     }
 
-    pub fn unwrap(self) -> ~[Json] {
+    pub fn unwrap(self) -> Vec<Json> {
         let JsonListBuilder { list } = self;
         list
     }
@@ -823,31 +827,31 @@ impl JsonListBuilder {
 }
 
 pub struct JsonObjectBuilder {
-    object: ~json::Object
+    object: json::Object
 }
 
 impl JsonObjectBuilder {
     pub fn new() -> JsonObjectBuilder {
-        JsonObjectBuilder { object: ~TreeMap::new() }
+        JsonObjectBuilder { object: TreeMap::new() }
     }
 
-    pub fn unwrap(self) -> ~json::Object {
+    pub fn unwrap(self) -> json::Object {
         let JsonObjectBuilder { object } = self;
         object
     }
 
-    pub fn insert<T: ToJson>(self, key: ~str, value: T) -> JsonObjectBuilder {
+    pub fn insert<T: ToJson>(self, key: String, value: T) -> JsonObjectBuilder {
         let mut builder = self;
         builder.object.insert(key, value.to_json());
         builder
     }
 
-    pub fn insert_list<'a>(self, key: ~str, f: |JsonListBuilder| -> JsonListBuilder) -> JsonObjectBuilder {
+    pub fn insert_list<'a>(self, key: String, f: |JsonListBuilder| -> JsonListBuilder) -> JsonObjectBuilder {
         let builder = JsonListBuilder::new();
         self.insert(key, f(builder).unwrap())
     }
 
-    pub fn insert_object<'a>(self, key: ~str, f: |JsonObjectBuilder| -> JsonObjectBuilder) -> JsonObjectBuilder {
+    pub fn insert_object<'a>(self, key: String, f: |JsonObjectBuilder| -> JsonObjectBuilder) -> JsonObjectBuilder {
         let builder = JsonObjectBuilder::new();
         self.insert(key, json::Object(f(builder).unwrap()))
     }
@@ -888,37 +892,37 @@ impl ZMQTransport {
 
         match self.socket.send_str(request, 0) {
             Ok(()) => { }
-            Err(e) => fail!(e.to_str()),
+            Err(e) => fail!(e.to_string()),
         }
 
         match self.socket.recv_msg(0) {
             Ok(msg) => {
                 let bytes = msg.to_bytes();
-                debug!("response: {:?}", bytes);
-                Response::parse(bytes)
+                debug!("response: {}", bytes);
+                Response::parse(bytes.as_slice())
             },
-            Err(e) => fail!(e.to_str()),
+            Err(e) => fail!(e.to_string()),
         }
     }
 }
 
 /// Zeromq transport implementation
 impl Transport for ZMQTransport {
-    fn head(&self, path: &str) -> Response { self.send(format!("HEAD|{}", path)) }
-    fn get(&self, path: &str) -> Response { self.send(format!("GET|{}", path)) }
-    fn put(&self, path: &str, source: ~json::Object) -> Response {
-        self.send(format!("PUT|{}|{}", path, json::Object(source).to_str()))
+    fn head(&self, path: &str) -> Response { self.send(format!("HEAD|{}", path).as_slice()) }
+    fn get(&self, path: &str) -> Response { self.send(format!("GET|{}", path).as_slice()) }
+    fn put(&self, path: &str, source: json::Object) -> Response {
+        self.send(format!("PUT|{}|{}", path, json::Object(source).to_string()).as_slice())
     }
-    fn post(&self, path: &str, source: ~json::Object) -> Response {
-        self.send(format!("POST|{}|{}", path, json::Object(source).to_str()))
+    fn post(&self, path: &str, source: json::Object) -> Response {
+        self.send(format!("POST|{}|{}", path, json::Object(source).to_string()).as_slice())
     }
-    fn delete(&self, path: &str, source: Option<~json::Object>) -> Response {
+    fn delete(&self, path: &str, source: Option<json::Object>) -> Response {
         match source {
-            None => self.send(format!("DELETE|{}", path)),
+            None => self.send(format!("DELETE|{}", path).as_slice()),
             Some(source) =>
                 self.send(format!("DELETE|{}|{}",
                     path,
-                    json::Object(source).to_str())),
+                    json::Object(source).to_string()).as_slice()),
         }
     }
 }
@@ -926,14 +930,14 @@ impl Transport for ZMQTransport {
 /// Helper function to creating a client with zeromq
 pub fn connect_with_zmq(ctx: zmq::Context, addr: &str) -> Result<Client, zmq::Error> {
     match ZMQTransport::new(ctx, addr) {
-        Ok(transport) => Ok(Client::new(~transport as ~Transport)),
+        Ok(transport) => Ok(Client::new(box transport as Box<Transport>)),
         Err(e) => Err(e),
     }
 }
 
 pub struct Response {
     code: uint,
-    status: ~str,
+    status: String,
     body: json::Json,
 }
 
@@ -960,10 +964,13 @@ impl Response {
         }
     }
 
-    fn parse_status(msg: &[u8], start: uint, end: uint) -> (uint, ~str) {
-        match msg.slice(start,end).iter().position(|c| *c == '|' as u8) {
+    fn parse_status(msg: &[u8], start: uint, end: uint) -> (uint, String) {
+        match msg.slice(start, end).iter().position(|c| *c == '|' as u8) {
             None => fail!("invalid response"),
-            Some(i) => (i + 1u, str::from_utf8(msg.slice(start, i))),
+            Some(i) => {
+                let bytes = msg.slice(start, i).to_owned();
+                (i + 1u, String::from_utf8(bytes).unwrap())
+            }
         }
     }
 
@@ -974,7 +981,7 @@ impl Response {
 
         match json::from_reader(&mut rdr as &mut Reader) {
             Ok(json) => json,
-            Err(e) => fail!(e.to_str()),
+            Err(e) => fail!(e.to_string()),
         }
     }
 }
