@@ -939,6 +939,7 @@ pub fn connect_with_zmq(ctx: &mut zmq::Context, addr: &str) -> Result<Client, zm
     }
 }
 
+#[deriving(PartialEq, Clone, Show)]
 pub struct Response {
     pub code: uint,
     pub status: String,

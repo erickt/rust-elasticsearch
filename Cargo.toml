@@ -7,5 +7,9 @@ authors = [ "erick.tryzelaar@gmail.com" ]
 name = "elasticsearch"
 path = "src/elasticsearch/lib.rs"
 
+[[example]]
+name = "example"
+path = "examples/main.rs"
+
 [dependencies.zmq]
 git = "https://github.com/erickt/rust-zmq"
