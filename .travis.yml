@@ -12,5 +12,4 @@ install:
 script:
   - ./cargo-nightly/bin/cargo build --verbose
   - ./cargo-nightly/bin/cargo test --verbose
-  - ./bin/test
-  - ./bin/example
+  #- ./target/test/example
