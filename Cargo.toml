@@ -11,5 +11,8 @@ path = "src/elasticsearch/lib.rs"
 name = "example"
 path = "examples/main.rs"
 
+[dependencies.http]
+git = "https://github.com/chris-morgan/rust-http"
+
 [dependencies.zmq]
 git = "https://github.com/erickt/rust-zmq"

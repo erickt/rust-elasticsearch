@@ -7,11 +7,16 @@ extern crate log;
 
 extern crate serialize;
 extern crate url;
+extern crate http;
 extern crate zmq;
 
-use std::uint;
+use std::u16;
 use std::io::{Reader, BufReader};
 use std::collections::TreeMap;
+
+use http::client::RequestWriter;
+use http::headers::content_type;
+use http::method;
 
 use serialize::json::{Json, ToJson};
 use serialize::json;
@@ -861,16 +866,89 @@ impl JsonObjectBuilder {
     }
 }
 
-/// Transport to tralk to Elasticsearch with HTTP
-/*
+/// Transport to talk to Elasticsearch with HTTP
 pub struct HTTPTransport { 
-    url: Url,
+    addr: String,
 }
 
 impl HTTPTransport {
-    fn new(url: Url)
+    pub fn new(addr: String) -> HTTPTransport {
+        HTTPTransport {
+            addr: addr,
+        }
+    }
+
+    pub fn send(&mut self, method: method::Method, request: &str, body: Option<json::Object>) -> Response {
+        debug!("request: {} {} {} {}", self.addr, method, request, body);
+
+        let url = format!("{}/{}", self.addr, request);
+        let url = from_str(url.as_slice()).unwrap();
+        let mut request: RequestWriter = RequestWriter::new(method, url).unwrap();
+
+        match body {
+            Some(body) => {
+                let body = json::Object(body).to_string();
+                request.headers.content_length = Some(body.len());
+                request.headers.content_type = Some(
+                    content_type::MediaType::new(
+                        "application".to_string(),
+                        "json".to_string(),
+                        vec!()
+                    )
+                );
+                println!("here1");
+                request.write(body.as_bytes()).unwrap();
+                println!("here2");
+            }
+            None => { }
+        }
+
+        println!("here3");
+        let mut response = match request.read_response() {
+            Ok(response) => response,
+            Err(_) => { fail!() }
+        };
+        println!("here4");
+
+        let body = response.read_to_end().unwrap();
+        let body = String::from_utf8(body).unwrap();
+        println!("here4 {}", body);
+        let body = json::from_str(body.as_slice()).unwrap();
+        println!("here4 {}", body);
+
+        Response {
+            code: response.status.code(),
+            status: response.status.reason().to_string(),
+            //body: json::from_reader(&mut response).unwrap(),
+            body: body,
+        }
+    }
 }
-*/
+
+/// Zeromq transport implementation
+impl Transport for HTTPTransport {
+    fn head(&mut self, path: &str) -> Response {
+        self.send(method::Head, path, None)
+    }
+    fn get(&mut self, path: &str) -> Response {
+        self.send(method::Get, path, None)
+    }
+    fn put(&mut self, path: &str, body: json::Object) -> Response {
+        self.send(method::Get, path, Some(body))
+    }
+    fn post(&mut self, path: &str, body: json::Object) -> Response {
+        self.send(method::Post, path, Some(body))
+    }
+    fn delete(&mut self, path: &str, body: Option<json::Object>) -> Response {
+        self.send(method::Post, path, body)
+    }
+}
+
+/// Helper function to creating a client with zeromq
+pub fn connect_with_http(addr: &str) -> Client {
+    let transport = HTTPTransport::new(addr.to_string());
+    Client::new(box transport as Box<Transport>)
+}
 
 /// Transport to talk to Elasticsearch with zeromq
 pub struct ZMQTransport { socket: zmq::Socket }
@@ -941,7 +1019,7 @@ pub fn connect_with_zmq(ctx: &mut zmq::Context, addr: &str) -> Result<Client, zm
 
 #[deriving(PartialEq, Clone, Show)]
 pub struct Response {
-    pub code: uint,
+    pub code: u16,
     pub status: String,
     pub body: json::Json,
 }
@@ -957,11 +1035,11 @@ impl Response {
         Response { code: code, status: status, body: body }
     }
 
-    fn parse_code(msg: &[u8], end: uint) -> (uint, uint) {
+    fn parse_code(msg: &[u8], end: uint) -> (uint, u16) {
         match msg.slice(0, end).iter().position(|c| *c == '|' as u8) {
             None => fail!("invalid response"),
             Some(i) => {
-                match uint::parse_bytes(msg.slice(0u, i), 10u) {
+                match u16::parse_bytes(msg.slice(0u, i), 10u) {
                     Some(code) => (i + 1u, code),
                     None => fail!("invalid status code"),
                 }
