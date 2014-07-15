@@ -9,7 +9,6 @@ extern crate serialize;
 extern crate url;
 extern crate zmq;
 
-use std::str;
 use std::uint;
 use std::io::{Reader, BufReader};
 use std::collections::TreeMap;
@@ -21,11 +20,11 @@ use zmq::{Context, Socket};
 
 /// The low level interface to elasticsearch
 pub trait Transport {
-    fn head(&self, path: &str) -> Response;
-    fn get(&self, path: &str) -> Response;
-    fn put(&self, path: &str, source: json::Object) -> Response;
-    fn post(&self, path: &str, source: json::Object) -> Response;
-    fn delete(&self, path: &str, source: Option<json::Object>) -> Response;
+    fn head(&mut self, path: &str) -> Response;
+    fn get(&mut self, path: &str) -> Response;
+    fn put(&mut self, path: &str, source: json::Object) -> Response;
+    fn post(&mut self, path: &str, source: json::Object) -> Response;
+    fn delete(&mut self, path: &str, source: Option<json::Object>) -> Response;
 }
 
 /// The high level interface to elasticsearch
@@ -40,17 +39,17 @@ impl Client {
     }
 
     /// Create an index
-    pub fn prepare_create_index<'a>(&'a self, index: String) -> CreateIndexBuilder<'a> {
+    pub fn prepare_create_index<'a>(&'a mut self, index: String) -> CreateIndexBuilder<'a> {
         CreateIndexBuilder::new(self, index)
     }
 
     /// Delete indices
-    pub fn prepare_delete_index<'a>(&'a self) -> DeleteIndexBuilder<'a> {
+    pub fn prepare_delete_index<'a>(&'a mut self) -> DeleteIndexBuilder<'a> {
         DeleteIndexBuilder::new(self)
     }
 
     /// Get a specific document
-    pub fn get(&self, index: &str, typ: &str, id: &str) -> Response {
+    pub fn get(&mut self, index: &str, typ: &str, id: &str) -> Response {
         let path = [
             url::encode_component(index),
             url::encode_component(typ),
@@ -60,27 +59,27 @@ impl Client {
     }
 
     /// Create an index builder that will create documents
-    pub fn prepare_index<'a>(&'a self, index: String, typ: String) -> IndexBuilder<'a> {
+    pub fn prepare_index<'a>(&'a mut self, index: String, typ: String) -> IndexBuilder<'a> {
         IndexBuilder::new(self, index, typ)
     }
 
     /// Create a search builder that will query elasticsearch
-    pub fn prepare_search<'a>(&'a self) -> SearchBuilder<'a> {
+    pub fn prepare_search<'a>(&'a mut self) -> SearchBuilder<'a> {
         SearchBuilder::new(self)
     }
 
     /// Delete a document
-    pub fn delete(&self, index: String, typ: String, id: String) -> Response {
+    pub fn delete(&mut self, index: String, typ: String, id: String) -> Response {
         self.prepare_delete(index, typ, id).execute()
     }
 
     /// Delete a document
-    pub fn prepare_delete<'a>(&'a self, index: String, typ: String, id: String) -> DeleteBuilder<'a> {
+    pub fn prepare_delete<'a>(&'a mut self, index: String, typ: String, id: String) -> DeleteBuilder<'a> {
         DeleteBuilder::new(self, index, typ, id)
     }
 
     /// Create a search builder that will query elasticsearch
-    pub fn prepare_delete_by_query<'a>(&'a self) -> DeleteByQueryBuilder<'a> {
+    pub fn prepare_delete_by_query<'a>(&'a mut self) -> DeleteByQueryBuilder<'a> {
         DeleteByQueryBuilder::new(self)
     }
 }
@@ -91,14 +90,14 @@ pub enum OpType { CREATE, INDEX }
 pub enum VersionType { INTERNAL, EXTERNAL }
 
 pub struct CreateIndexBuilder<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     index: String,
     timeout: Option<String>,
     source: Option<json::Object>,
 }
 
 impl<'a> CreateIndexBuilder<'a> {
-    pub fn new(client: &'a Client, index: String) -> CreateIndexBuilder<'a> {
+    pub fn new(client: &'a mut Client, index: String) -> CreateIndexBuilder<'a> {
         CreateIndexBuilder {
             client: client,
             index: index,
@@ -118,7 +117,7 @@ impl<'a> CreateIndexBuilder<'a> {
         builder
     }
     pub fn execute(&mut self) -> Response {
-        let mut path = url::encode_component(self.index);
+        let mut path = url::encode_component(self.index.as_slice());
 
         let mut params = vec!();
 
@@ -142,13 +141,13 @@ impl<'a> CreateIndexBuilder<'a> {
 }
 
 pub struct DeleteIndexBuilder<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     indices: Vec<String>,
     timeout: Option<String>,
 }
 
 impl<'a> DeleteIndexBuilder<'a> {
-    pub fn new(client: &'a Client) -> DeleteIndexBuilder<'a> {
+    pub fn new(client: &'a mut Client) -> DeleteIndexBuilder<'a> {
         DeleteIndexBuilder {
             client: client,
             indices: vec!(),
@@ -168,7 +167,7 @@ impl<'a> DeleteIndexBuilder<'a> {
     }
     pub fn execute(&mut self) -> Response {
         let indices: Vec<String> = self.indices.iter().map(|i| {
-            url::encode_component(*i)
+            url::encode_component(i.as_slice())
         }).collect();
         let mut path = indices.connect(",");
 
@@ -190,7 +189,7 @@ impl<'a> DeleteIndexBuilder<'a> {
 }
 
 pub struct IndexBuilder<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     index: String,
     typ: String,
     id: Option<String>,
@@ -212,7 +211,7 @@ pub struct IndexBuilder<'a> {
 }
 
 impl<'a> IndexBuilder<'a> {
-    pub fn new(client: &'a Client, index: String, typ: String) -> IndexBuilder<'a> {
+    pub fn new(client: &'a mut Client, index: String, typ: String) -> IndexBuilder<'a> {
         IndexBuilder {
             client: client,
             index: index,
@@ -308,14 +307,14 @@ impl<'a> IndexBuilder<'a> {
     }
     pub fn execute(&mut self) -> Response {
         let mut path = vec!(
-            url::encode_component(self.index),
-            url::encode_component(self.typ),
+            url::encode_component(self.index.as_slice()),
+            url::encode_component(self.typ.as_slice()),
         );
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match self.id {
             None => { },
-            Some(ref id) => path.push(url::encode_component(*id)),
+            Some(ref id) => path.push(url::encode_component(id.as_slice())),
         }
 
         let mut path = path.connect("/");
@@ -408,7 +407,7 @@ pub enum SearchType {
 }
 
 pub struct SearchBuilder<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     indices: Vec<String>,
     types: Vec<String>,
 
@@ -422,7 +421,7 @@ pub struct SearchBuilder<'a> {
 }
 
 impl<'a> SearchBuilder<'a> {
-    pub fn new(client: &'a Client) -> SearchBuilder<'a> {
+    pub fn new(client: &'a mut Client) -> SearchBuilder<'a> {
         SearchBuilder {
             client: client,
             indices: vec!(),
@@ -480,11 +479,11 @@ impl<'a> SearchBuilder<'a> {
     }
     pub fn execute(&mut self) -> Response {
         let indices: Vec<String> = self.indices.iter().map(|i| {
-            url::encode_component(*i)
+            url::encode_component(i.as_slice())
         }).collect();
 
         let types: Vec<String> = self.types.iter().map(|t| {
-            url::encode_component(*t)
+            url::encode_component(t.as_slice())
         }).collect();
 
         let mut path = vec!();
@@ -547,7 +546,7 @@ impl<'a> SearchBuilder<'a> {
 }
 
 pub struct DeleteBuilder<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     index: String,
     typ: String,
     id: String,
@@ -562,7 +561,12 @@ pub struct DeleteBuilder<'a> {
 }
 
 impl<'a> DeleteBuilder<'a> {
-    pub fn new(client: &'a Client, index: String, typ: String, id: String) -> DeleteBuilder<'a> {
+    pub fn new(
+        client: &'a mut Client,
+        index: String,
+        typ: String,
+        id: String
+    ) -> DeleteBuilder<'a> {
         DeleteBuilder {
             client: client,
             index: index,
@@ -621,9 +625,9 @@ impl<'a> DeleteBuilder<'a> {
     }
     pub fn execute(&mut self) -> Response {
         let mut path = [
-            url::encode_component(self.index),
-            url::encode_component(self.typ),
-            url::encode_component(self.id)
+            url::encode_component(self.index.as_slice()),
+            url::encode_component(self.typ.as_slice()),
+            url::encode_component(self.id.as_slice())
         ].connect("/");
 
         // Build the query parameters.
@@ -631,39 +635,39 @@ impl<'a> DeleteBuilder<'a> {
 
         match self.consistency {
             None => { },
-            Some(One) => params.push("consistency=one"),
-            Some(Quorum) => params.push("consistency=quorum"),
-            Some(All) => params.push("consistency=all"),
+            Some(One) => params.push("consistency=one".to_string()),
+            Some(Quorum) => params.push("consistency=quorum".to_string()),
+            Some(All) => params.push("consistency=all".to_string()),
         }
 
-        if self.refresh { params.push("refresh=true"); }
+        if self.refresh { params.push("refresh=true".to_string()); }
 
         match self.replication {
             None => { }
-            Some(Sync) => params.push("replication=sync"),
-            Some(Async) => params.push("replication=async"),
+            Some(Sync) => params.push("replication=sync".to_string()),
+            Some(Async) => params.push("replication=async".to_string()),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match self.routing {
             None => { }
-            Some(ref s) => params.push(format!("routing={}", *s).as_slice()),
+            Some(ref s) => params.push(format!("routing={}", *s)),
         }
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
         match self.timeout {
             None => { }
-            Some(ref s) => params.push(format!("timeout={}", *s).as_slice()),
+            Some(ref s) => params.push(format!("timeout={}", *s)),
         }
 
         match self.version {
             None => { }
-            Some(ref s) => params.push(format!("version={}", *s).as_slice()),
+            Some(ref s) => params.push(format!("version={}", *s)),
         }
 
         match self.version_type {
             INTERNAL => { }
-            EXTERNAL => params.push("version_type=external"),
+            EXTERNAL => params.push("version_type=external".to_string()),
         }
 
         if !params.is_empty() {
@@ -676,7 +680,7 @@ impl<'a> DeleteBuilder<'a> {
 }
 
 pub struct DeleteByQueryBuilder<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
     indices: Vec<String>,
     types: Vec<String>,
 
@@ -690,7 +694,7 @@ pub struct DeleteByQueryBuilder<'a> {
 }
 
 impl<'a> DeleteByQueryBuilder<'a> {
-    pub fn new(client: &'a Client) -> DeleteByQueryBuilder<'a> {
+    pub fn new(client: &'a mut Client) -> DeleteByQueryBuilder<'a> {
         DeleteByQueryBuilder {
             client: client,
             indices: vec!(),
@@ -873,8 +877,8 @@ pub struct ZMQTransport { socket: zmq::Socket }
 
 /// Create a zeromq transport to Elasticsearch
 impl ZMQTransport {
-    pub fn new(ctx: zmq::Context, addr: &str) -> Result<ZMQTransport, zmq::Error> {
-        let socket = match ctx.socket(zmq::REQ) {
+    pub fn new(ctx: &mut zmq::Context, addr: &str) -> Result<ZMQTransport, zmq::Error> {
+        let mut socket = match ctx.socket(zmq::REQ) {
             Ok(socket) => socket,
             Err(e) => { return Err(e); }
         };
@@ -887,7 +891,7 @@ impl ZMQTransport {
         Ok(ZMQTransport { socket: socket })
     }
 
-    pub fn send(&self, request: &str) -> Response {
+    pub fn send(&mut self, request: &str) -> Response {
         debug!("request: {}", request);
 
         match self.socket.send_str(request, 0) {
@@ -908,15 +912,15 @@ impl ZMQTransport {
 
 /// Zeromq transport implementation
 impl Transport for ZMQTransport {
-    fn head(&self, path: &str) -> Response { self.send(format!("HEAD|{}", path).as_slice()) }
-    fn get(&self, path: &str) -> Response { self.send(format!("GET|{}", path).as_slice()) }
-    fn put(&self, path: &str, source: json::Object) -> Response {
+    fn head(&mut self, path: &str) -> Response { self.send(format!("HEAD|{}", path).as_slice()) }
+    fn get(&mut self, path: &str) -> Response { self.send(format!("GET|{}", path).as_slice()) }
+    fn put(&mut self, path: &str, source: json::Object) -> Response {
         self.send(format!("PUT|{}|{}", path, json::Object(source).to_string()).as_slice())
     }
-    fn post(&self, path: &str, source: json::Object) -> Response {
+    fn post(&mut self, path: &str, source: json::Object) -> Response {
         self.send(format!("POST|{}|{}", path, json::Object(source).to_string()).as_slice())
     }
-    fn delete(&self, path: &str, source: Option<json::Object>) -> Response {
+    fn delete(&mut self, path: &str, source: Option<json::Object>) -> Response {
         match source {
             None => self.send(format!("DELETE|{}", path).as_slice()),
             Some(source) =>
@@ -928,7 +932,7 @@ impl Transport for ZMQTransport {
 }
 
 /// Helper function to creating a client with zeromq
-pub fn connect_with_zmq(ctx: zmq::Context, addr: &str) -> Result<Client, zmq::Error> {
+pub fn connect_with_zmq(ctx: &mut zmq::Context, addr: &str) -> Result<Client, zmq::Error> {
     match ZMQTransport::new(ctx, addr) {
         Ok(transport) => Ok(Client::new(box transport as Box<Transport>)),
         Err(e) => Err(e),
@@ -936,9 +940,9 @@ pub fn connect_with_zmq(ctx: zmq::Context, addr: &str) -> Result<Client, zmq::Er
 }
 
 pub struct Response {
-    code: uint,
-    status: String,
-    body: json::Json,
+    pub code: uint,
+    pub status: String,
+    pub body: json::Json,
 }
 
 impl Response {
