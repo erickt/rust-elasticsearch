@@ -145,12 +145,19 @@ impl<'a> CreateIndexBuilder<'a> {
         builder.source = Some(source);
         builder
     }
-    pub fn execute(&mut self) -> Response {
-        let mut path = url::encode_component(self.index.as_slice());
+    pub fn execute(self) -> Response {
+        let CreateIndexBuilder {
+            client,
+            index,
+            timeout,
+            source,
+        } = self;
+
+        let mut path = url::encode_component(index.as_slice());
 
         let mut params = vec!();
 
-        match self.timeout {
+        match timeout {
             None => { },
             Some(ref s) => {
                 params.push(format!("timeout={}", s));
@@ -162,12 +169,12 @@ impl<'a> CreateIndexBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        let source = match self.source.take() {
+        let source = match source {
             None => TreeMap::new(),
             Some(source) => source,
         };
 
-        self.client.request(method::Put, path.as_slice(), Some(source))
+        client.request(method::Put, path.as_slice(), Some(source))
     }
 }
 
@@ -196,8 +203,14 @@ impl<'a> DeleteIndexBuilder<'a> {
         builder.timeout = Some(timeout);
         builder
     }
-    pub fn execute(&mut self) -> Response {
-        let indices: Vec<String> = self.indices.iter().map(|i| {
+    pub fn execute(self) -> Response {
+        let DeleteIndexBuilder {
+            client,
+            indices,
+            timeout,
+        } = self;
+
+        let indices: Vec<String> = indices.iter().map(|i| {
             url::encode_component(i.as_slice())
         }).collect();
         let mut path = indices.connect(",");
@@ -205,7 +218,7 @@ impl<'a> DeleteIndexBuilder<'a> {
         // Build the query parameters.
         let mut params = vec!();
 
-        match self.timeout {
+        match timeout {
             None => { },
             Some(ref timeout) => params.push(format!("timeout={}", timeout)),
         }
@@ -215,7 +228,7 @@ impl<'a> DeleteIndexBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        self.client.request(method::Delete, path.as_slice(), None)
+        client.request(method::Delete, path.as_slice(), None)
     }
 }
 
@@ -336,14 +349,34 @@ impl<'a> IndexBuilder<'a> {
         builder.source = Some(source);
         builder
     }
-    pub fn execute(&mut self) -> Response {
+    pub fn execute(self) -> Response {
+        let IndexBuilder {
+            client,
+            index,
+            typ,
+            id,
+            consistency,
+            op_type,
+            parent,
+            percolate,
+            refresh,
+            replication,
+            routing,
+            timeout,
+            timestamp,
+            ttl,
+            version,
+            version_type,
+            source,
+        } = self;
+
         let mut path = vec!(
-            url::encode_component(self.index.as_slice()),
-            url::encode_component(self.typ.as_slice()),
+            url::encode_component(index.as_slice()),
+            url::encode_component(typ.as_slice()),
         );
 
         // FIXME: https://github.com/mozilla/rust/issues/2549
-        match self.id {
+        match id {
             None => { },
             Some(ref id) => path.push(url::encode_component(id.as_slice())),
         }
@@ -351,62 +384,62 @@ impl<'a> IndexBuilder<'a> {
         let mut path = path.connect("/");
         let mut params = vec!();
 
-        match self.consistency {
+        match consistency {
             None => { },
             Some(One) => params.push("consistency=one".to_string()),
             Some(Quorum) => params.push("consistency=quorum".to_string()),
             Some(All) => params.push("consistency=all".to_string()),
         }
 
-        match self.op_type {
+        match op_type {
             CREATE => params.push("op_type=create".to_string()),
             INDEX => { }
         }
 
-        match self.parent {
+        match parent {
             None => { },
             Some(ref s) => params.push(format!("parent={}", s)),
         }
 
-        match self.percolate {
+        match percolate {
             None => { }
             Some(ref s) =>  params.push(format!("percolate={}", s)),
         }
 
-        if self.refresh { params.push("refresh=true".to_string()); }
+        if refresh { params.push("refresh=true".to_string()); }
 
-        match self.replication {
+        match replication {
             None => { },
             Some(Sync) => params.push("replication=sync".to_string()),
             Some(Async) => params.push("replication=async".to_string()),
         }
 
-        match self.routing {
+        match routing {
             None => { },
             Some(ref s) => params.push(format!("routing={}", s)),
         }
 
-        match self.timeout {
+        match timeout {
             None => { },
             Some(ref s) => params.push(format!("timeout={}", s)),
         }
 
-        match self.timestamp {
+        match timestamp {
             None => { },
             Some(ref s) => params.push(format!("timestamp={}", s)),
         }
 
-        match self.ttl {
+        match ttl {
             None => { },
             Some(ref s) => params.push(format!("ttl={}", s)),
         }
 
-        match self.version {
+        match version {
             None => { },
             Some(ref i) => { params.push(format!("version={}", i)); }
         }
 
-        match self.version_type {
+        match version_type {
             INTERNAL => { },
             EXTERNAL => params.push("version_type=external".to_string()),
         }
@@ -416,14 +449,14 @@ impl<'a> IndexBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        let source = match self.source.take() {
+        let source = match source {
             None => TreeMap::new(),
             Some(source) => source,
         };
 
-        match self.id {
-            None => self.client.request(method::Post, path.as_slice(), Some(source)),
-            Some(_) => self.client.request(method::Put, path.as_slice(), Some(source)),
+        match id {
+            None => client.request(method::Post, path.as_slice(), Some(source)),
+            Some(_) => client.request(method::Put, path.as_slice(), Some(source)),
         }
     }
 }
@@ -464,7 +497,7 @@ impl<'a> SearchBuilder<'a> {
             search_type: None,
             timeout: None,
 
-            source: None
+            source: None,
         }
     }
 
@@ -508,12 +541,24 @@ impl<'a> SearchBuilder<'a> {
         builder.source = Some(source);
         builder
     }
-    pub fn execute(&mut self) -> Response {
-        let indices: Vec<String> = self.indices.iter().map(|i| {
+    pub fn execute(self) -> Response {
+        let SearchBuilder {
+            client,
+            indices,
+            types,
+            preference,
+            routing,
+            scroll,
+            search_type,
+            timeout,
+            source,
+        } = self;
+
+        let indices: Vec<String> = indices.iter().map(|i| {
             url::encode_component(i.as_slice())
         }).collect();
 
-        let types: Vec<String> = self.types.iter().map(|t| {
+        let types: Vec<String> = types.iter().map(|t| {
             url::encode_component(t.as_slice())
         }).collect();
 
@@ -528,22 +573,22 @@ impl<'a> SearchBuilder<'a> {
         // Build the query parameters.
         let mut params = vec!();
 
-        match self.preference {
+        match preference {
             None => { },
             Some(ref s) => params.push(format!("preference={}", s)),
         }
 
-        match self.routing {
+        match routing {
             None => { },
             Some(ref s) => params.push(format!("routing={}", s)),
         }
 
-        match self.scroll {
+        match scroll {
             None => { },
             Some(ref s) => params.push(format!("scroll={}", s)),
         }
 
-        match self.search_type {
+        match search_type {
             None => { },
             Some(DfsQueryThenFetch) =>
                 params.push("search_type=dfs_query_then_fetch".to_string()),
@@ -557,7 +602,7 @@ impl<'a> SearchBuilder<'a> {
             Some(Count) => params.push("search_type=count".to_string()),
         }
 
-        match self.timeout {
+        match timeout {
             None => { }
             Some(ref s) => params.push(format!("timeout={}", s)),
         }
@@ -567,12 +612,7 @@ impl<'a> SearchBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        let source = match self.source.take() {
-            None => TreeMap::new(),
-            Some(source) => source,
-        };
-
-        self.client.request(method::Post, path.as_slice(), Some(source))
+        client.request(method::Post, path.as_slice(), source)
     }
 }
 
@@ -654,49 +694,61 @@ impl<'a> DeleteBuilder<'a> {
         builder.version_type = version_type;
         builder
     }
-    pub fn execute(&mut self) -> Response {
+    pub fn execute(self) -> Response {
+        let DeleteBuilder {
+            client,
+            index,
+            typ,
+            id,
+            consistency,
+            refresh,
+            replication,
+            routing,
+            timeout,
+            version,
+            version_type,
+        } = self;
+
         let mut path = [
-            url::encode_component(self.index.as_slice()),
-            url::encode_component(self.typ.as_slice()),
-            url::encode_component(self.id.as_slice())
+            url::encode_component(index.as_slice()),
+            url::encode_component(typ.as_slice()),
+            url::encode_component(id.as_slice())
         ].connect("/");
 
         // Build the query parameters.
         let mut params = vec!();
 
-        match self.consistency {
+        match consistency {
             None => { },
             Some(One) => params.push("consistency=one".to_string()),
             Some(Quorum) => params.push("consistency=quorum".to_string()),
             Some(All) => params.push("consistency=all".to_string()),
         }
 
-        if self.refresh { params.push("refresh=true".to_string()); }
+        if refresh { params.push("refresh=true".to_string()); }
 
-        match self.replication {
+        match replication {
             None => { }
             Some(Sync) => params.push("replication=sync".to_string()),
             Some(Async) => params.push("replication=async".to_string()),
         }
 
-        // FIXME: https://github.com/mozilla/rust/issues/2549
-        match self.routing {
+        match routing {
             None => { }
             Some(ref s) => params.push(format!("routing={}", *s)),
         }
 
-        // FIXME: https://github.com/mozilla/rust/issues/2549
-        match self.timeout {
+        match timeout {
             None => { }
             Some(ref s) => params.push(format!("timeout={}", *s)),
         }
 
-        match self.version {
+        match version {
             None => { }
             Some(ref s) => params.push(format!("version={}", *s)),
         }
 
-        match self.version_type {
+        match version_type {
             INTERNAL => { }
             EXTERNAL => params.push("version_type=external".to_string()),
         }
@@ -706,7 +758,7 @@ impl<'a> DeleteBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        self.client.request(method::Delete, path.as_slice(), None)
+        client.request(method::Delete, path.as_slice(), None)
     }
 }
 
@@ -782,7 +834,19 @@ impl<'a> DeleteByQueryBuilder<'a> {
         builder
     }
 
-    pub fn execute(&mut self) -> Response {
+    pub fn execute(self) -> Response {
+        let DeleteByQueryBuilder {
+            client,
+            indices,
+            types,
+            consistency,
+            refresh,
+            replication,
+            routing,
+            timeout,
+            source,
+        } = self;
+
         let mut path = vec!();
 
         path.push(self.indices.connect(","));
@@ -794,27 +858,27 @@ impl<'a> DeleteByQueryBuilder<'a> {
         // Build the query parameters.
         let mut params = vec!();
 
-        match self.consistency {
+        match consistency {
             None => {}
             Some(One) => params.push("consistency=one".to_string()),
             Some(Quorum) => params.push("consistency=quorum".to_string()),
             Some(All) => params.push("consistency=all".to_string()),
         }
 
-        if self.refresh { params.push("refresh=true".to_string()); }
+        if refresh { params.push("refresh=true".to_string()); }
 
-        match self.replication {
+        match replication {
             None => { }
             Some(Sync)  => params.push("replication=sync".to_string()),
             Some(Async) => params.push("replication=async".to_string()),
         }
 
-        match self.routing {
+        match routing {
             None => { }
             Some(ref routing) => params.push(format!("routing={}", routing)),
         }
 
-        match self.timeout {
+        match timeout {
             None => { }
             Some(ref timeout) => params.push(format!("timeout={}", timeout)),
         }
@@ -824,9 +888,7 @@ impl<'a> DeleteByQueryBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        let source = self.source.take();
-
-        self.client.request(method::Delete, path.as_slice(), source)
+        client.request(method::Delete, path.as_slice(), source)
     }
 }
 
