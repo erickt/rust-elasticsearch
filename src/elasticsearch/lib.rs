@@ -8,10 +8,7 @@ extern crate log;
 extern crate serialize;
 extern crate url;
 extern crate http;
-extern crate zmq;
 
-use std::u16;
-use std::io::{Reader, BufReader};
 use std::collections::TreeMap;
 
 use http::client::RequestWriter;
@@ -21,26 +18,17 @@ use http::method;
 use serialize::json::{Json, ToJson};
 use serialize::json;
 
-use zmq::{Context, Socket};
-
-/// The low level interface to elasticsearch
-pub trait Transport {
-    fn head(&mut self, path: &str) -> Response;
-    fn get(&mut self, path: &str) -> Response;
-    fn put(&mut self, path: &str, source: json::Object) -> Response;
-    fn post(&mut self, path: &str, source: json::Object) -> Response;
-    fn delete(&mut self, path: &str, source: Option<json::Object>) -> Response;
-}
-
 /// The high level interface to elasticsearch
 pub struct Client {
-    transport: Box<Transport>
+    addr: String,
 }
 
 impl Client {
     /// Create an elasticsearch client
-    pub fn new(transport: Box<Transport>) -> Client {
-        Client { transport: transport }
+    pub fn new(addr: &str) -> Client {
+        Client {
+            addr: addr.to_string(),
+        }
     }
 
     /// Create an index
@@ -60,7 +48,8 @@ impl Client {
             url::encode_component(typ),
             url::encode_component(id)
         ].connect("/");
-        self.transport.get(path.as_slice())
+
+        self.request(method::Get, path.as_slice(), None)
     }
 
     /// Create an index builder that will create documents
@@ -86,6 +75,41 @@ impl Client {
     /// Create a search builder that will query elasticsearch
     pub fn prepare_delete_by_query<'a>(&'a mut self) -> DeleteByQueryBuilder<'a> {
         DeleteByQueryBuilder::new(self)
+    }
+
+    fn request(&mut self, method: method::Method, request: &str, body: Option<json::Object>) -> Response {
+        debug!("request: {} {} {} {}", self.addr, method, request, body);
+
+        let url = format!("{}/{}", self.addr, request);
+        let url = from_str(url.as_slice()).unwrap();
+        let mut request: RequestWriter = RequestWriter::new(method, url).unwrap();
+
+        match body {
+            Some(body) => {
+                let body = json::Object(body).to_string();
+                request.headers.content_length = Some(body.len());
+                request.headers.content_type = Some(
+                    content_type::MediaType::new(
+                        "application".to_string(),
+                        "json".to_string(),
+                        vec!()
+                    )
+                );
+                request.write(body.as_bytes()).unwrap();
+            }
+            None => { }
+        }
+
+        let mut response = match request.read_response() {
+            Ok(response) => response,
+            Err(_) => { fail!() }
+        };
+
+        Response {
+            code: response.status.code(),
+            status: response.status.reason().to_string(),
+            body: json::from_reader(&mut response).unwrap(),
+        }
     }
 }
 
@@ -138,10 +162,12 @@ impl<'a> CreateIndexBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        match self.source.take() {
-            None => self.client.transport.put(path.as_slice(), TreeMap::new()),
-            Some(source) => self.client.transport.put(path.as_slice(), source),
-        }
+        let source = match self.source.take() {
+            None => TreeMap::new(),
+            Some(source) => source,
+        };
+
+        self.client.request(method::Put, path.as_slice(), Some(source))
     }
 }
 
@@ -189,7 +215,7 @@ impl<'a> DeleteIndexBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        self.client.transport.delete(path.as_slice(), None)
+        self.client.request(method::Delete, path.as_slice(), None)
     }
 }
 
@@ -396,8 +422,8 @@ impl<'a> IndexBuilder<'a> {
         };
 
         match self.id {
-            None => self.client.transport.post(path.as_slice(), source),
-            Some(_) => self.client.transport.put(path.as_slice(), source),
+            None => self.client.request(method::Post, path.as_slice(), Some(source)),
+            Some(_) => self.client.request(method::Put, path.as_slice(), Some(source)),
         }
     }
 }
@@ -546,7 +572,7 @@ impl<'a> SearchBuilder<'a> {
             Some(source) => source,
         };
 
-        self.client.transport.post(path.as_slice(), source)
+        self.client.request(method::Post, path.as_slice(), Some(source))
     }
 }
 
@@ -680,7 +706,7 @@ impl<'a> DeleteBuilder<'a> {
             path.push_str(params.connect("&").as_slice());
         }
 
-        self.client.transport.delete(path.as_slice(), None)
+        self.client.request(method::Delete, path.as_slice(), None)
     }
 }
 
@@ -800,7 +826,7 @@ impl<'a> DeleteByQueryBuilder<'a> {
 
         let source = self.source.take();
 
-        self.client.transport.delete(path.as_slice(), source)
+        self.client.request(method::Delete, path.as_slice(), source)
     }
 }
 
@@ -866,194 +892,9 @@ impl JsonObjectBuilder {
     }
 }
 
-/// Transport to talk to Elasticsearch with HTTP
-pub struct HTTPTransport { 
-    addr: String,
-}
-
-impl HTTPTransport {
-    pub fn new(addr: String) -> HTTPTransport {
-        HTTPTransport {
-            addr: addr,
-        }
-    }
-
-    pub fn send(&mut self, method: method::Method, request: &str, body: Option<json::Object>) -> Response {
-        debug!("request: {} {} {} {}", self.addr, method, request, body);
-
-        let url = format!("{}/{}", self.addr, request);
-        let url = from_str(url.as_slice()).unwrap();
-        let mut request: RequestWriter = RequestWriter::new(method, url).unwrap();
-
-        match body {
-            Some(body) => {
-                let body = json::Object(body).to_string();
-                request.headers.content_length = Some(body.len());
-                request.headers.content_type = Some(
-                    content_type::MediaType::new(
-                        "application".to_string(),
-                        "json".to_string(),
-                        vec!()
-                    )
-                );
-                request.write(body.as_bytes()).unwrap();
-            }
-            None => { }
-        }
-
-        let mut response = match request.read_response() {
-            Ok(response) => response,
-            Err(_) => { fail!() }
-        };
-
-        Response {
-            code: response.status.code(),
-            status: response.status.reason().to_string(),
-            body: json::from_reader(&mut response).unwrap(),
-        }
-    }
-}
-
-/// Zeromq transport implementation
-impl Transport for HTTPTransport {
-    fn head(&mut self, path: &str) -> Response {
-        self.send(method::Head, path, None)
-    }
-    fn get(&mut self, path: &str) -> Response {
-        self.send(method::Get, path, None)
-    }
-    fn put(&mut self, path: &str, body: json::Object) -> Response {
-        self.send(method::Put, path, Some(body))
-    }
-    fn post(&mut self, path: &str, body: json::Object) -> Response {
-        self.send(method::Post, path, Some(body))
-    }
-    fn delete(&mut self, path: &str, body: Option<json::Object>) -> Response {
-        self.send(method::Delete, path, body)
-    }
-}
-
-/// Helper function to creating a client with zeromq
-pub fn connect_with_http(addr: &str) -> Client {
-    let transport = HTTPTransport::new(addr.to_string());
-    Client::new(box transport as Box<Transport>)
-}
-
-/// Transport to talk to Elasticsearch with zeromq
-pub struct ZMQTransport { socket: zmq::Socket }
-
-/// Create a zeromq transport to Elasticsearch
-impl ZMQTransport {
-    pub fn new(ctx: &mut zmq::Context, addr: &str) -> Result<ZMQTransport, zmq::Error> {
-        let mut socket = match ctx.socket(zmq::REQ) {
-            Ok(socket) => socket,
-            Err(e) => { return Err(e); }
-        };
-
-        match socket.connect(addr) {
-            Ok(()) => { }
-            Err(e) => { return Err(e); }
-        }
-
-        Ok(ZMQTransport { socket: socket })
-    }
-
-    pub fn send(&mut self, request: &str) -> Response {
-        debug!("request: {}", request);
-
-        match self.socket.send_str(request, 0) {
-            Ok(()) => { }
-            Err(e) => fail!(e.to_string()),
-        }
-
-        match self.socket.recv_msg(0) {
-            Ok(msg) => {
-                let bytes = msg.to_bytes();
-                debug!("response: {}", bytes);
-                Response::parse(bytes.as_slice())
-            },
-            Err(e) => fail!(e.to_string()),
-        }
-    }
-}
-
-/// Zeromq transport implementation
-impl Transport for ZMQTransport {
-    fn head(&mut self, path: &str) -> Response { self.send(format!("HEAD|{}", path).as_slice()) }
-    fn get(&mut self, path: &str) -> Response { self.send(format!("GET|{}", path).as_slice()) }
-    fn put(&mut self, path: &str, source: json::Object) -> Response {
-        self.send(format!("PUT|{}|{}", path, json::Object(source).to_string()).as_slice())
-    }
-    fn post(&mut self, path: &str, source: json::Object) -> Response {
-        self.send(format!("POST|{}|{}", path, json::Object(source).to_string()).as_slice())
-    }
-    fn delete(&mut self, path: &str, source: Option<json::Object>) -> Response {
-        match source {
-            None => self.send(format!("DELETE|{}", path).as_slice()),
-            Some(source) =>
-                self.send(format!("DELETE|{}|{}",
-                    path,
-                    json::Object(source).to_string()).as_slice()),
-        }
-    }
-}
-
-/// Helper function to creating a client with zeromq
-pub fn connect_with_zmq(ctx: &mut zmq::Context, addr: &str) -> Result<Client, zmq::Error> {
-    match ZMQTransport::new(ctx, addr) {
-        Ok(transport) => Ok(Client::new(box transport as Box<Transport>)),
-        Err(e) => Err(e),
-    }
-}
-
 #[deriving(PartialEq, Clone, Show)]
 pub struct Response {
     pub code: u16,
     pub status: String,
     pub body: json::Json,
-}
-
-impl Response {
-    fn parse(msg: &[u8]) -> Response {
-        let end = msg.len();
-
-        let (start, code) = Response::parse_code(msg, end);
-        let (start, status) = Response::parse_status(msg, start, end);
-        let body = Response::parse_body(msg, start, end);
-
-        Response { code: code, status: status, body: body }
-    }
-
-    fn parse_code(msg: &[u8], end: uint) -> (uint, u16) {
-        match msg.slice(0, end).iter().position(|c| *c == '|' as u8) {
-            None => fail!("invalid response"),
-            Some(i) => {
-                match u16::parse_bytes(msg.slice(0u, i), 10u) {
-                    Some(code) => (i + 1u, code),
-                    None => fail!("invalid status code"),
-                }
-            }
-        }
-    }
-
-    fn parse_status(msg: &[u8], start: uint, end: uint) -> (uint, String) {
-        match msg.slice(start, end).iter().position(|c| *c == '|' as u8) {
-            None => fail!("invalid response"),
-            Some(i) => {
-                let bytes = msg.slice(start, i).to_owned();
-                (i + 1u, String::from_utf8(bytes).unwrap())
-            }
-        }
-    }
-
-    fn parse_body(msg: &[u8], start: uint, end: uint) -> json::Json {
-        if start == end { return json::Null; }
-
-        let mut rdr = BufReader::new(msg.slice(start, end));
-
-        match json::from_reader(&mut rdr as &mut Reader) {
-            Ok(json) => json,
-            Err(e) => fail!(e.to_string()),
-        }
-    }
 }

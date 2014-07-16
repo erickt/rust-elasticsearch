@@ -1,10 +1,9 @@
-extern crate zmq;
 extern crate elasticsearch;
 
 use elasticsearch::JsonObjectBuilder;
 
 fn main() {
-    let mut client = elasticsearch::connect_with_http("http://localhost:9200");
+    let mut client = elasticsearch::Client::new("http://localhost:9200");
     /*
     println!("{}\n", client.transport.head("/"));
     println!("{}\n", client.transport.get("/"));
