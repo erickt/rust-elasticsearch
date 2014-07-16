@@ -9,6 +9,7 @@ fn main() {
     println!("{}\n", client.transport.get("/"));
     */
 
+    println!("create an index");
     println!("{}\n", client.prepare_create_index("test".to_string())
         .set_source(JsonObjectBuilder::new()
             .insert_object("settings".to_string(), |bld| {
@@ -20,8 +21,24 @@ fn main() {
         )
         .execute());
 
+    println!("try to fetch a non-existing document");
     println!("{}\n", client.get("test", "test", "1"));
 
+    println!("make that document");
+    println!("{}\n", client.prepare_index("test".to_string(), "test".to_string())
+      .set_id("1".to_string())
+      //.set_version(2u)
+      .set_source(JsonObjectBuilder::new()
+          .insert("foo".to_string(), 5.0f64)
+          .insert("bar".to_string(), "wee".to_string())
+          .insert_object("baz".to_string(), |bld| bld.insert("a".to_string(), 2.0f64))
+          .insert_list("boo".to_string(), |bld| bld.push("aaa".to_string()).push("zzz".to_string()))
+          .unwrap()
+      )
+      .set_refresh(true)
+      .execute());
+
+    println!("we should conflict if we have a conflicting version");
     println!("{}\n", client.prepare_index("test".to_string(), "test".to_string())
       .set_id("1".to_string())
       .set_version(2u)
@@ -35,6 +52,7 @@ fn main() {
       .set_refresh(true)
       .execute());
 
+    println!("try to fetch that document");
     println!("{}\n", client.get("test", "test", "1"));
 
     println!("{}\n", client.prepare_search()
@@ -45,8 +63,10 @@ fn main() {
       )
       .execute());
 
+    println!("try to delete that document");
     println!("{}\n", client.delete("test".to_string(), "test".to_string(), "1".to_string()));
 
+    println!("index another document");
     println!("{}\n", client.prepare_index("test".to_string(), "test".to_string())
       .set_id("2".to_string())
       .set_source(JsonObjectBuilder::new()
@@ -56,6 +76,7 @@ fn main() {
       .set_refresh(true)
       .execute());
 
+    println!("delete that document with a query");
     println!("{}\n", client.prepare_delete_by_query()
       .set_indices(vec!["test".to_string()])
       .set_source(JsonObjectBuilder::new()
@@ -64,6 +85,7 @@ fn main() {
       )
       .execute());
 
+    println!("finally, delete our test index");
     println!("{}\n", client.prepare_delete_index()
       .set_indices(vec!["test".to_string()])
       .execute());
