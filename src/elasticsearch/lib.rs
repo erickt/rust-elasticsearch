@@ -896,31 +896,20 @@ impl HTTPTransport {
                         vec!()
                     )
                 );
-                println!("here1");
                 request.write(body.as_bytes()).unwrap();
-                println!("here2");
             }
             None => { }
         }
 
-        println!("here3");
         let mut response = match request.read_response() {
             Ok(response) => response,
             Err(_) => { fail!() }
         };
-        println!("here4");
-
-        let body = response.read_to_end().unwrap();
-        let body = String::from_utf8(body).unwrap();
-        println!("here4 {}", body);
-        let body = json::from_str(body.as_slice()).unwrap();
-        println!("here4 {}", body);
 
         Response {
             code: response.status.code(),
             status: response.status.reason().to_string(),
-            //body: json::from_reader(&mut response).unwrap(),
-            body: body,
+            body: json::from_reader(&mut response).unwrap(),
         }
     }
 }
@@ -934,13 +923,13 @@ impl Transport for HTTPTransport {
         self.send(method::Get, path, None)
     }
     fn put(&mut self, path: &str, body: json::Object) -> Response {
-        self.send(method::Get, path, Some(body))
+        self.send(method::Put, path, Some(body))
     }
     fn post(&mut self, path: &str, body: json::Object) -> Response {
         self.send(method::Post, path, Some(body))
     }
     fn delete(&mut self, path: &str, body: Option<json::Object>) -> Response {
-        self.send(method::Post, path, body)
+        self.send(method::Delete, path, body)
     }
 }
 
