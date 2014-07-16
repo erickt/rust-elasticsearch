@@ -564,8 +564,16 @@ impl<'a> SearchBuilder<'a> {
 
         let mut path = vec!();
 
-        path.push(indices.connect(","));
-        path.push(types.connect(","));
+        if indices.is_empty() {
+            path.push("_all".to_string());
+        } else {
+            path.push(indices.connect(","));
+        }
+
+        if !types.is_empty() {
+            path.push(types.connect(","));
+        }
+
         path.push("_search".to_string());
 
         let mut path = path.connect("/");
@@ -849,8 +857,16 @@ impl<'a> DeleteByQueryBuilder<'a> {
 
         let mut path = vec!();
 
-        path.push(self.indices.connect(","));
-        path.push(self.types.connect(","));
+        if indices.is_empty() {
+            path.push("_all".to_string());
+        } else {
+            path.push(indices.connect(","));
+        }
+
+        if !types.is_empty() {
+            path.push(types.connect(","));
+        }
+
         path.push("_query".to_string());
 
         let mut path = path.connect("/");
